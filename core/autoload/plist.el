@@ -24,11 +24,11 @@ list, the pair is destructured into (CAR . CDR)."
 ;;;###autoload
 (defmacro plist-put! (plist &rest rest)
   "Set each PROP VALUE pair in REST to PLIST in-place."
-  `(cl-loop for (prop value)
-            on (list ,@rest) by #'cddr
-            do ,(if (symbolp plist)
-                    `(setq ,plist (plist-put ,plist prop value))
-                  `(plist-put ,plist prop value))))
+  (let ((r plist))
+    (cl-loop
+       for (prop value) on rest by #'cddr
+       do (setq r `(plist-put ,r ,prop ,value)))
+    `(setq ,plist ,r)))
 
 ;;;###autoload
 (defmacro plist-delete! (plist prop)
@@ -49,20 +49,10 @@ list, the pair is destructured into (CAR . CDR)."
 ;;;###autoload
 (defun doom-plist-merge (from-plist to-plist)
   "Non-destructively merge FROM-PLIST onto TO-PLIST"
-  (let ((plist (copy-sequence from-plist)))
-    (while plist
-      (plist-put! to-plist (pop plist) (pop plist)))
+  (let ((to-plist (copy-sequence to-plist)))
+    (while from-plist
+      (plist-put! to-plist (pop from-plist) (pop from-plist)))
     to-plist))
-
-;;;###autoload
-(defun doom-plist-delete-nil (plist)
-  "Delete `nil' properties from a copy of PLIST."
-  (let (p)
-    (while plist
-      (if (car plist)
-          (plist-put! p (car plist) (nth 1 plist)))
-      (setq plist (cddr plist)))
-    p))
 
 ;;;###autoload
 (defun doom-plist-delete (plist &rest props)
@@ -73,3 +63,8 @@ list, the pair is destructured into (CAR . CDR)."
           (plist-put! p (car plist) (nth 1 plist)))
       (setq plist (cddr plist)))
     p))
+
+;;;###autoload
+(defsubst doom-plist-delete-nil (plist)
+  "Delete `nil' properties from a copy of PLIST."
+  (doom-plist-delete plist nil))

@@ -233,8 +233,7 @@ users).")
 ;; Emacs stores `authinfo' in $HOME and in plain-text. Let's not do that, mkay?
 ;; This file stores usernames, passwords, and other such treasures for the
 ;; aspiring malicious third party.
-(setq auth-sources (list (concat doom-etc-dir "authinfo.gpg")
-                         "~/.authinfo.gpg"))
+(setq auth-sources (list "~/.authinfo.gpg"))
 
 ;; Don't litter `doom-emacs-dir'. We don't use `no-littering' because it's a
 ;; mote too opinionated for our needs.

@@ -16,23 +16,23 @@ following shell commands:
   :bare t
   (let ((doom-auto-discard force-p))
     (cond
-     (packages-only-p
-      (doom-cli-execute "sync" '("-u"))
-      (print! (success "Finished upgrading Doom Emacs")))
+      (packages-only-p
+       (doom-cli-execute "sync" '("-u"))
+       (print! (success "Finished upgrading Doom Emacs")))
 
-     ((doom-cli-upgrade doom-auto-accept doom-auto-discard)
-      ;; Reload Doom's CLI & libraries, in case there were any upstream changes.
-      ;; Major changes will still break, however
-      (print! (info "Reloading Doom Emacs"))
-      (doom-cli-execute-after "doom" "upgrade" "-p" (if force-p "-f")))
+      ((doom-cli-upgrade doom-auto-accept doom-auto-discard)
+       ;; Reload Doom's CLI & libraries, in case there were any upstream changes.
+       ;; Major changes will still break, however
+       (print! (info "Reloading Doom Emacs"))
+       (doom-cli-execute-after "doom" "upgrade" "-p" (if force-p "-f")))
 
-     ((print! "Doom is up-to-date!")))))
+      ((print! "Doom is up-to-date!")))))
 
 
 ;;
 ;;; library
 
-(defvar doom-repo-url "https://github.com/hlissner/doom-emacs"
+(defvar doom-repo-url "https://github.com/SwiftLawnGnome/doom-emacs.git"
   "The git repo url for Doom Emacs.")
 (defvar doom-repo-remote "_upgrade"
   "The name to use as our staging remote.")

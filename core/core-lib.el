@@ -50,7 +50,7 @@ list is returned as-is."
 
 (defun doom-enlist (exp)
   "Return EXP wrapped in a list, or as-is if already a list."
-  (declare (pure t) (side-effect-free t))
+  (declare (pure t) (side-effect-free error-free))
   (if (listp exp) exp (list exp)))
 
 (defun doom-keyword-intern (str)
@@ -115,11 +115,11 @@ unreadable. Returns the names of envvars that were changed."
                                   'omit-nulls))))))
       (setq-default
        process-environment
-       (append (nreverse env)
-               (default-value 'process-environment))
+       (nconc (nreverse env)
+              (default-value 'process-environment))
        exec-path
-       (append (split-string (getenv "PATH") path-separator t)
-               (list exec-directory))
+       (nconc (split-string (getenv "PATH") path-separator t)
+              (list exec-directory))
        shell-file-name
        (or (getenv "SHELL")
            (default-value 'shell-file-name)))
@@ -163,9 +163,9 @@ at the values with which this function was called."
   "Lexically bind ENVVARS in BODY, like `let' but for `process-environment'."
   (declare (indent 1))
   `(let ((process-environment (copy-sequence process-environment)))
-     (dolist (var (list ,@(cl-loop for (var val) in envvars
-                                   collect `(cons ,var ,val))))
-       (setenv (car var) (cdr var)))
+     ,@(mapcar (lambda (var-val)
+                 `(setenv ,(car var-val) ,(cadr var-val)))
+               envvars)
      ,@body))
 
 (defmacro letf! (bindings &rest body)
@@ -251,17 +251,18 @@ or aliases."
   (declare (doc-string 1) (pure t) (side-effect-free t))
   `(lambda (&rest _) (interactive) ,@body))
 
-(defmacro cmd!! (command &optional prefix-arg &rest args)
+(defmacro cmd!! (command &optional cmd-prefix-arg &rest args)
   "Expands to a closure that interactively calls COMMAND with ARGS.
 A factory for quickly producing interactive, prefixed commands for keybinds or
 aliases."
   (declare (doc-string 1) (pure t) (side-effect-free t))
-  `(lambda (arg &rest _) (interactive "P")
-     (let ((current-prefix-arg (or ,prefix-arg arg)))
+  `(lambda (arg &rest _)
+     (interactive "P")
+     (let ((current-prefix-arg (or ,cmd-prefix-arg arg)))
        (,(if args
              'funcall-interactively
            'call-interactively)
-        ,command ,@args))))
+         ,command ,@args))))
 
 (defmacro cmds! (&rest branches)
   "Expands to a `menu-item' dispatcher for keybinds."
@@ -312,9 +313,14 @@ If FETCHER is a function, ELT is used as the key in LIST (an alist)."
 (defmacro pushnew! (place &rest values)
   "Push VALUES sequentially into PLACE, if they aren't already present.
 This is a variadic `cl-pushnew'."
-  (let ((var (make-symbol "result")))
-    `(dolist (,var (list ,@values) (with-no-warnings ,place))
-       (cl-pushnew ,var ,place :test #'equal))))
+  (gv-letplace (getter setter) place
+    (let* (;; (var (make-symbol "result"))
+           (res getter))
+      ;; `(dolist (,var (list ,@values) (with-no-warnings ,place))
+      ;;    (cl-pushnew ,var ,place :test #'equal))
+      (while values
+        (setq res `(cl-adjoin ,(pop values) ,res :test #'equal)))
+      (funcall setter res))))
 
 (defmacro prependq! (sym &rest lists)
   "Prepend LISTS to SYM in place."

@@ -33,6 +33,8 @@
 ;; All that said, you can still use package.el's commands, but 'bin/doom sync'
 ;; will purge ELPA packages.
 
+(require 'macroexp)
+
 (defvar doom-packages ()
   "A list of enabled packages. Each element is a sublist, whose CAR is the
 package's name as a symbol, and whose CDR is the plist supplied to its
@@ -456,7 +458,8 @@ elsewhere."
            (cl-destructuring-bind
                (&key local-repo _files _flavor
                      _no-build _no-byte-compile _no-autoloads
-                     _type _repo _host _branch _remote _nonrecursive _fork _depth)
+                     _type _repo _host _branch _remote _nonrecursive _fork _depth
+                     _no-native-compile)
                recipe
              ;; Expand :local-repo from current directory
              (when local-repo
@@ -501,8 +504,9 @@ Or any combination of the above.
 This macro should only be used from the user's private packages.el. No module
 should use it!"
   (if (memq t targets)
-      `(mapc (doom-rpartial #'doom-package-set :unpin t)
-             (mapcar #'car doom-packages))
+      `(mapc (lambda (package)
+               (doom-package-set (car package) :unpin t))
+             doom-packages)
     (macroexp-progn
      (mapcar
       (lambda (target)

@@ -8,16 +8,14 @@
 (load! "autoload/output")
 
 ;; Create all our core directories to quell file errors
-(mapc (doom-rpartial #'make-directory 'parents)
-      (list doom-local-dir
-            doom-etc-dir
-            doom-cache-dir))
+(make-directory doom-local-dir 'parents)
+(make-directory doom-etc-dir 'parents)
+(make-directory doom-cache-dir 'parents)
 
 ;; Ensure straight and the bare minimum is ready to go
 (require 'core-modules)
 (require 'core-packages)
 (doom-initialize-core-packages)
-
 
 ;;
 ;;; Variables
@@ -43,20 +41,19 @@ purpose.")
 
 (cl-defstruct
     (doom-cli
-     (:constructor nil)
-     (:constructor
-      make-doom-cli
-      (name &key desc aliases optlist arglist plist fn
-            &aux
-            (optlist
-             (cl-loop for (symbol options desc) in optlist
-                      for ((_ . options) (_ . params))
-                      = (seq-group-by #'stringp options)
-                      collect
-                      (make-doom-cli-option :symbol symbol
-                                            :flags options
-                                            :args params
-                                            :desc desc))))))
+      (:constructor nil)
+      (:constructor
+          make-doom-cli
+          (name &key desc aliases optlist arglist plist fn
+           &aux (optlist
+                 (cl-loop for (symbol options desc) in optlist
+                    for ((_ . options) (_ . params))
+                     = (seq-group-by #'stringp options)
+                    collect
+                     (make-doom-cli-option :symbol symbol
+                                           :flags options
+                                           :args params
+                                           :desc desc))))))
   (name nil :read-only t)
   (desc "TODO")
   aliases
@@ -72,15 +69,16 @@ purpose.")
   (desc "TODO"))
 
 (defun doom--cli-get-option (cli flag)
-  (cl-find-if (doom-partial #'member flag)
-              (doom-cli-optlist cli)
-              :key #'doom-cli-option-flags))
+  (cl-loop for opt in (doom-cli-optlist cli)
+     if (member flag (doom-cli-option-flags opt))
+     return opt))
 
 (defun doom--cli-process (cli args)
-  (let* ((args (copy-sequence args))
-         (arglist (copy-sequence (doom-cli-arglist cli)))
+  (let* ((args args)
+         (arglist (doom-cli-arglist cli))
          (expected
-          (or (cl-position-if (doom-rpartial #'memq cl--lambda-list-keywords)
+          (or (cl-position-if (lambda (arg)
+                                (memq arg cl--lambda-list-keywords))
                               arglist)
               (length arglist)))
          (got 0)
@@ -152,7 +150,7 @@ purpose.")
                          (command))
                    doom--cli-commands)))))
 
-(defun doom-cli-internal-p (cli)
+(defsubst doom-cli-internal-p (cli)
   "Return non-nil if CLI is an internal (non-public) command."
   (string-prefix-p ":" (doom-cli-name cli)))
 
@@ -184,6 +182,7 @@ upgrade')."
           (zerop add-mode)
           (set-file-modes post-script (logior current-mode add-mode))))))
 
+;;;###autoload
 (defmacro defcli! (name speclist &optional docstring &rest body)
   "Defines a CLI command.
 
