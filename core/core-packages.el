@@ -116,7 +116,6 @@ uses a straight or package.el command directly).")
         (repo-url (concat "http" (if gnutls-verify-error "s")
                           "://github.com/"
                           (or (plist-get recipe :repo) "raxod502/straight.el")))
-        (branch (or (plist-get recipe :branch) straight-repository-branch))
         (call (if doom-debug-p #'doom-exec-process #'doom-call-process)))
     (unless (file-directory-p repo-dir)
       (message "Installing straight...")
@@ -300,26 +299,29 @@ installed."
             (load file noerror 'nomessage 'nosuffix)
           (when (file-exists-p file)
             (insert-file-contents file)
-            (let (emacs-lisp-mode) (emacs-lisp-mode))
             ;; Scrape `package!' blocks from FILE for a comprehensive listing of
             ;; packages used by this module.
-            (while (search-forward "(package!" nil t)
-              (let ((ppss (save-excursion (syntax-ppss))))
-                ;; Don't collect packages in comments or strings
-                (unless (or (nth 3 ppss)
-                            (nth 4 ppss))
-                  (goto-char (match-beginning 0))
-                  (cl-destructuring-bind (_ name . plist)
-                      (read (current-buffer))
-                    (push (cons
-                           name (plist-put
-                                 plist :modules
-                                 (list (doom-module-from-path file))))
-                          doom-packages))))))))
+            (delay-mode-hooks
+              (emacs-lisp-mode)
+              (while (search-forward "(package!" nil t)
+                (let ((ppss (save-excursion (syntax-ppss))))
+                  ;; Don't collect packages in comments or strings
+                  (unless (or (nth 3 ppss)
+                              (nth 4 ppss))
+                    (goto-char (match-beginning 0))
+                    (cl-destructuring-bind (_ name . plist)
+                        (read (current-buffer))
+                      (push (cons
+                             name (plist-put
+                                   plist :modules
+                                   (list (doom-module-from-path file))))
+                            doom-packages)))))))))
     (error
      (signal 'doom-package-error
              (list (doom-module-from-path file)
                    file e)))))
+
+(defvar doom--current-module)
 
 (defun doom-package-list (&optional all-p core-only-p)
   "Retrieve a list of explicitly declared packages from enabled modules.
