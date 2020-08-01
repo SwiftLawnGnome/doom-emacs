@@ -22,28 +22,27 @@ Returns (approximately):
 
 This is used by `file-exists-p!' and `project-file-exists-p!'."
   (declare (pure t) (side-effect-free t))
-  (if (and (listp spec)
-           (memq (car spec) '(or and)))
+  (if (memq (car-safe spec) '(or and))
       (cons (car spec)
-            (mapcar (doom-rpartial #'doom--resolve-path-forms directory)
+            (mapcar (lambda (s)
+                      (doom--resolve-path-forms s directory))
                     (cdr spec)))
-    (let ((filevar (make-symbol "file")))
-      `(let ((,filevar ,spec))
-         (and (stringp ,filevar)
-              ,(if directory
-                   `(let ((default-directory ,directory))
-                      (file-exists-p ,filevar))
-                 `(file-exists-p ,filevar))
-              ,filevar)))))
+    (macroexp-let2 macroexp-copyable-p file spec
+      `(and (stringp ,file)
+            ,(if directory
+                 `(let ((default-directory ,directory))
+                    (file-exists-p ,file))
+               `(file-exists-p ,file))
+            ,file))))
 
 (defun doom--path (&rest segments)
   (let ((dir (pop segments)))
-    (unless segments
-      (setq dir (expand-file-name dir)))
-    (while segments
-      (setq dir (expand-file-name (car segments) dir)
-            segments (cdr segments)))
-    dir))
+    (if (null segments)
+        (expand-file-name dir)
+      (while segments
+        (setq dir (expand-file-name (car segments) dir)
+              segments (cdr segments)))
+      dir)))
 
 ;;;###autoload
 (defun doom-glob (&rest segments)
@@ -51,17 +50,17 @@ This is used by `file-exists-p!' and `project-file-exists-p!'."
 Returns nil if the path doesn't exist."
   (let* (case-fold-search
          (dir (apply #'doom--path segments)))
-    (if (string-match-p "[[*?]" dir)
-        (file-expand-wildcards dir t)
-      (if (file-exists-p dir)
-          dir))))
+    (cond
+      ((string-match-p "[[*?]" dir)
+       (file-expand-wildcards dir t))
+      ((file-exists-p dir) dir))))
 
 ;;;###autoload
-(defun doom-path (&rest segments)
+(define-inline doom-path (&rest segments)
   "Constructs a file path from SEGMENTS."
   (if segments
-      (apply #'doom--path segments)
-    (file!)))
+      (inline-quote (doom--path . ,segments))
+    (inline-quote (file!))))
 
 ;;;###autoload
 (defun doom-dir (&rest segments)
@@ -115,12 +114,12 @@ MATCH is a string regexp. Only entries that match it will be included."
                    (<= mindepth 0)
                    (list (cond (map (funcall map file))
                                (relative-to (file-relative-name file relative-to))
-                               (file))))
+                               (t file))))
               (and (>= depth 1)
                    (apply #'doom-files-in file
-                          (append (list :mindepth (1- mindepth)
-                                        :depth (1- depth)
-                                        :relative-to relative-to)
+                          (nconc (list :mindepth (1- mindepth)
+                                       :depth (1- depth)
+                                       :relative-to relative-to)
                                   rest)))))
             ((and (memq type '(t files))
                   (string-match-p match file)
