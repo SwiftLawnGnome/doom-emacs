@@ -1,5 +1,7 @@
 ;;; core/autoload/output.el -*- lexical-binding: t; -*-
 
+(require 'core)
+
 (defvar doom-output-ansi-alist
   '(;; fx
     (bold       1 :weight bold)

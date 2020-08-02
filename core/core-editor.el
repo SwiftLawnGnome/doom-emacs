@@ -370,7 +370,7 @@ files, so we replace calls to `pp' with the much faster `prin1'."
                 doom-inhibit-indent-detection
                 doom-large-file-p
                 (memq major-mode doom-detect-indentation-excluded-modes)
-                (member (substring (buffer-name) 0 1) '(" " "*")))
+                (memq (aref (buffer-name) 0) '(?\s ?*)))
       ;; Don't display messages in the echo area, but still log them
       (let ((inhibit-message (not doom-debug-p)))
         (dtrt-indent-mode +1))))
@@ -403,8 +403,8 @@ files, so we replace calls to `pp' with the much faster `prin1'."
 
 (use-package! helpful
   ;; a better *help* buffer
-  :commands helpful--read-symbol
   :init
+  (autoload 'helpful--read-symbol "helpful")
   (global-set-key [remap describe-function] #'helpful-callable)
   (global-set-key [remap describe-command]  #'helpful-command)
   (global-set-key [remap describe-variable] #'helpful-variable)

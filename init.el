@@ -27,6 +27,8 @@
 ;;
 ;;; License: MIT
 
+(declare-function doom-initialize "core")
+
 ;; A big contributor to startup times is garbage collection. We up the gc
 ;; threshold to temporarily prevent it from running, then reset it later by
 ;; enabling `gcmh-mode'. Not resetting it will cause stuttering/freezes.

@@ -1,7 +1,9 @@
 ;;; tools/lookup/autoload/docsets.el -*- lexical-binding: t; -*-
 ;;;###if (featurep! +docsets)
 
-(defvar dash-docs-docsets nil)
+(defvar dash-docs-docsets)
+(defvar dash-docs-common-docsets)
+(defvar dash-docs-browser-func)
 
 ;;;###autodef
 (defun set-docsets! (modes &rest docsets)
@@ -25,30 +27,35 @@ Example:
     [\"TypeScript\" (bound-and-true-p tide-mode)])
 
 Used by `+lookup/in-docsets' and `+lookup/documentation'."
-  (declare (indent defun))
-  (let ((action (if (keywordp (car docsets)) (pop docsets))))
+  (declare (indent 1))
+  (mapc (lambda (doc)
+          (or (stringp doc) (vectorp doc)
+              (signal 'wrong-type-argument
+                      (list '(vector string) doc))))
+        docsets)
+  (let* ((action (if (keywordp (car docsets)) (pop docsets)))
+         (func (when docsets
+                 (lambda ()
+                   (make-local-variable 'dash-docs-docsets)
+                   (unless (memq action '(:add :remove))
+                     (setq dash-docs-docsets nil))
+                   (dolist (docset docsets)
+                     (cond
+                       ((not (or (stringp docset)
+                                 (prog1 (eval (aref docset 1) t)
+                                   (setq docset (aref docset 0)))))
+                        nil)
+                       ((eq action :remove)
+                        (setq dash-docs-docsets (delete docset dash-docs-docsets)))
+                       ((member docset dash-docs-docsets) nil)
+                       (t (push docset dash-docs-docsets))))))))
     (dolist (mode (doom-enlist modes))
       (let ((hook (intern (format "%s-hook" mode)))
-            (fn (intern (format "+lookup|init--%s-%s" (or action "set") mode))))
+            (fn-name (intern (format "+lookup|init--%s-%s" (or action "set") mode))))
         (if (null docsets)
-            (remove-hook hook fn)
-          (fset fn
-                (lambda ()
-                  (make-local-variable 'dash-docs-docsets)
-                  (unless (memq action '(:add :remove))
-                    (setq dash-docs-docset nil))
-                  (dolist (spec docsets)
-                    (cl-destructuring-bind (docset . pred)
-                        (cl-typecase spec
-                          (string (cons spec nil))
-                          (vector (cons (aref spec 0) (aref spec 1)))
-                          (otherwise (signal 'wrong-type-arguments (list spec '(vector string)))))
-                      (when (or (null pred)
-                                (eval pred t))
-                        (if (eq action :remove)
-                            (setq dash-docs-docsets (delete docset dash-docs-docsets))
-                          (cl-pushnew docset dash-docs-docsets)))))))
-          (add-hook hook fn 'append))))))
+            (remove-hook hook fn-name)
+          (fset fn-name func)
+          (add-hook hook fn-name 'append))))))
 
 ;;;###autoload
 (defun +lookup-dash-docsets-backend-fn (identifier)
@@ -66,7 +73,8 @@ Docsets must be installed with one of the following commands:
 
 Docsets can be searched directly via `+lookup/in-docsets'."
   (when (require 'dash-docs nil t)
-    (when-let (docsets (cl-remove-if-not #'dash-docs-docset-path (dash-docs-buffer-local-docsets)))
+    (when-let (docsets (cl-remove-if-not #'dash-docs-docset-path
+                                         (bound-and-true-p dash-docs-docsets)))
       (+lookup/in-docsets nil identifier docsets)
       'deferred)))
 

@@ -176,7 +176,7 @@ users).")
 (setq ad-redefinition-action 'accept)
 
 ;; Make `apropos' et co search more extensively. They're more useful this way.
-(setq apropos-do-all t)
+(with-eval-after-load 'apropos (setq apropos-do-all t))
 
 ;; A second, case-insensitive pass over `auto-mode-alist' is time wasted, and
 ;; indicates misconfiguration (or that the user needs to stop relying on case
@@ -204,6 +204,31 @@ users).")
 ;; slightly from 0.5s:
 (setq idle-update-delay 1.0)
 
+
+;; satisfy the compiler
+(defvar gnutls-verify-error)
+(defvar gnutls-algorithm-priority)
+(defvar gnutls-min-prime-bits)
+(defvar tls-checktrust)
+(defvar tls-program)
+(defvar async-byte-compile-log-file)
+(defvar bookmark-default-file)
+(defvar desktop-dirname)
+(defvar desktop-base-file-name)
+(defvar desktop-base-lock-name)
+(defvar pcache-directory)
+(defvar request-storage-directory)
+(defvar tramp-auto-save-directory)
+(defvar tramp-backup-directory-alist)
+(defvar tramp-persistency-file-name)
+(defvar url-cache-directory)
+(defvar url-configuration-directory)
+(defvar gamegrid-user-score-file-directory)
+(defvar ffap-machine-p-known)
+(defvar gcmh-idle-delay)
+(defvar gcmh-high-cons-threshold)
+(defvar gcmh-verbose)
+
 ;; Emacs is essentially one huge security vulnerability, what with all the
 ;; dependencies it pulls in from all corners of the globe. Let's try to be at
 ;; least a little more discerning.
@@ -218,7 +243,21 @@ users).")
                 ":+VERS-TLS1.2"))
       ;; `gnutls-min-prime-bits' is set based on recommendations from
       ;; https://www.keylength.com/en/4/
-      gnutls-min-prime-bits 3072
+      gnutls-min-prime-bits 3072)
+
+(with-eval-after-load 'tls
+  (setq ;; gnutls-verify-error (not (getenv "INSECURE"))
+      ;; gnutls-algorithm-priority
+      ;; (when (boundp 'libgnutls-version)
+      ;;   (concat "SECURE128:+SECURE192:-VERS-ALL"
+      ;;           (if (and (not IS-WINDOWS)
+      ;;                    (not (version< emacs-version "26.3"))
+      ;;                    (>= libgnutls-version 30605))
+      ;;               ":+VERS-TLS1.3")
+      ;;           ":+VERS-TLS1.2"))
+      ;; `gnutls-min-prime-bits' is set based on recommendations from
+      ;; https://www.keylength.com/en/4/
+      ;; gnutls-min-prime-bits 3072
       tls-checktrust gnutls-verify-error
       ;; Emacs is built with `gnutls' by default, so `tls-program' would not be
       ;; used in that case. Otherwise, people have reasons to not go with
@@ -228,7 +267,9 @@ users).")
                     "gnutls-cli -p %p --dh-bits=3072 --ocsp --x509cafile=%t \
 --strict-tofu --priority='SECURE192:+SECURE128:-VERS-ALL:+VERS-TLS1.2:+VERS-TLS1.3' %h"
                     ;; compatibility fallbacks
-                    "gnutls-cli -p %p %h"))
+                    "gnutls-cli -p %p %h")))
+
+
 
 ;; Emacs stores `authinfo' in $HOME and in plain-text. Let's not do that, mkay?
 ;; This file stores usernames, passwords, and other such treasures for the
@@ -304,6 +345,9 @@ config.el instead."
 ;; Performance on Windows is considerably worse than elsewhere. We'll need
 ;; everything we can get.
 (when IS-WINDOWS
+  (defvar w32-get-true-file-attributes)
+  (defvar w32-pipe-read-delay)
+  (defvar w32-pipe-buffer-size)
   (setq w32-get-true-file-attributes nil   ; decrease file IO workload
         w32-pipe-read-delay 0              ; faster ipc
         w32-pipe-buffer-size (* 64 1024))) ; read more at a time (was 4K)
@@ -454,7 +498,7 @@ If RETURN-P, return the message as a string instead of displaying it."
   (funcall (if return-p #'format #'message)
            "Doom loaded %d packages across %d modules in %.03fs"
            (- (length load-path) (length doom--initial-load-path))
-           (if doom-modules (hash-table-count doom-modules) 0)
+           (if (bound-and-true-p doom-modules) (hash-table-count doom-modules) 0)
            (or doom-init-time
                (setq doom-init-time
                      (float-time (time-subtract (current-time) before-init-time))))))
@@ -500,7 +544,7 @@ to least)."
     ;; like `doom-modules', `doom-disabled-packages', `load-path',
     ;; `auto-mode-alist', and `Info-directory-list'. etc. Compiling them into
     ;; one place is a big reduction in startup time.
-    (condition-case e
+    (condition-case nil
         ;; Avoid `file-name-sans-extension' for premature optimization reasons.
         ;; `string-remove-suffix' is cheaper because it performs no file sanity
         ;; checks; just plain ol' string manipulation.

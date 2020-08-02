@@ -1,5 +1,8 @@
 ;;; core/autoload/debug.el -*- lexical-binding: t; -*-
 
+(require 'core)
+(require 'core-modules)
+
 ;;
 ;;; Doom's debug mode
 
@@ -54,14 +57,15 @@
     (let (forms)
       (with-temp-buffer
         (insert-file-contents file)
-        (let (emacs-lisp-mode) (emacs-lisp-mode))
-        (while (re-search-forward (format "(%s " (regexp-quote form)) nil t)
-          (let ((ppss (syntax-ppss)))
-            (unless (or (nth 4 ppss)
-                        (nth 3 ppss))
-              (save-excursion
-                (goto-char (match-beginning 0))
-                (push (sexp-at-point) forms)))))
+        (delay-mode-hooks
+          (emacs-lisp-mode)
+          (while (re-search-forward (format "(%s " (regexp-quote form)) nil t)
+            (let ((ppss (syntax-ppss)))
+              (unless (or (nth 4 ppss)
+                          (nth 3 ppss))
+                (save-excursion
+                  (goto-char (match-beginning 0))
+                  (push (sexp-at-point) forms))))))
         (nreverse forms)))))
 
 ;;;###autoload

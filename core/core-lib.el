@@ -139,7 +139,7 @@ function which does the same as FUN, except that the last N arguments are fixed
 at the values with which this function was called."
   (declare (side-effect-free t))
   (lambda (&rest pre-args)
-    (apply fn (append pre-args args))))
+    (apply fn (nconc pre-args args))))
 
 
 ;;

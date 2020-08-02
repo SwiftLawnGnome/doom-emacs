@@ -1,5 +1,7 @@
 ;;; core-modules.el --- module & package management system -*- lexical-binding: t; -*-
 
+(require 'core)
+
 (defvar doom-init-modules-p nil
   "Non-nil if `doom-initialize-modules' has run.")
 
