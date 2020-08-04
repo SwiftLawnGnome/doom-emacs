@@ -1,34 +1,23 @@
 ;;; core.el --- the heart of the beast -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+
 (eval-when-compile
-  (when (< emacs-major-version 26)
-    (error "Detected Emacs v%s. Doom only supports Emacs 26 and newer"
+  (when (< emacs-major-version 27)
+    (error "Detected Emacs v%s. This fork of Doom only supports Emacs 27 and newer"
            emacs-version)))
 
+;; Just the bare necessities
+(require 'subr-x)
+(require 'cl-lib)
+(require 'core-lib)
 
-;;
-;;; Variables
-
-(defconst doom-version "2.0.9"
-  "Current version of Doom Emacs.")
-
-(defconst EMACS27+   (> emacs-major-version 26))
-(defconst EMACS28+   (> emacs-major-version 27))
-(defconst IS-MAC     (eq system-type 'darwin))
-(defconst IS-LINUX   (eq system-type 'gnu/linux))
-(defconst IS-WINDOWS (memq system-type '(cygwin windows-nt ms-dos)))
-(defconst IS-BSD     (or IS-MAC (eq system-type 'berkeley-unix)))
-
-;; Unix tools look for HOME, but this is normally not defined on Windows.
-(when (and IS-WINDOWS (null (getenv "HOME")))
-  (setenv "HOME" (getenv "USERPROFILE")))
-
-;; Ensure `doom-core-dir' is in `load-path'
-(add-to-list 'load-path (file-name-directory load-file-name))
-
-(defvar doom--initial-load-path load-path)
-(defvar doom--initial-process-environment process-environment)
-(defvar doom--initial-exec-path exec-path)
+(declare-function doom-reset-file-handler-alist-h "core")
+(declare-function gcmh-mode "gcmh")
+(declare-function doom-init-tty-h "core")
+(declare-function doom-debug-mode "debug")
+(declare-function doom-initialize-modules "core-modules")
+(declare-function doom-initialize-packages "core-packages")
 
 ;; `file-name-handler-alist' is consulted on every `require', `load' and various
 ;; path/io functions. You get a minor speed up by nooping this. However, this
@@ -44,7 +33,8 @@
     ;; Re-add rather than `setq', because file-name-handler-alist may have
     ;; changed since startup, and we want to preserve those.
     (dolist (handler file-name-handler-alist)
-      (add-to-list 'doom--initial-file-name-handler-alist handler))
+      (unless (member handler doom--initial-file-name-handler-alist)
+        (push handler doom--initial-file-name-handler-alist)))
     (setq file-name-handler-alist doom--initial-file-name-handler-alist))
   (add-hook 'emacs-startup-hook #'doom-reset-file-handler-alist-h))
 
@@ -54,92 +44,31 @@
 (unless (boundp 'tab-prefix-map)
   (defvar tab-prefix-map (make-sparse-keymap)))
 
-;; Just the bare necessities
-(require 'subr-x)
-(require 'cl-lib)
-(require 'core-lib)
 
-
-;;
-;;; Global variables
-
-(defvar doom-init-p nil
-  "Non-nil if Doom has been initialized.")
-
-(defvar doom-init-time nil
-  "The time it took, in seconds, for Doom Emacs to initialize.")
-
-(defvar doom-debug-p (or (getenv "DEBUG") init-file-debug)
-  "If non-nil, Doom will log more.
-
-Use `doom-debug-mode' to toggle it. The --debug-init flag and setting the DEBUG
-envvar will enable this at startup.")
-
-(defvar doom-interactive-p (not noninteractive)
-  "If non-nil, Emacs is in interactive mode.")
-
-;;; Directories/files
-(defconst doom-emacs-dir
-  (eval-when-compile (file-truename user-emacs-directory))
-  "The path to the currently loaded .emacs.d directory. Must end with a slash.")
-
-(defconst doom-core-dir (concat doom-emacs-dir "core/")
-  "The root directory of Doom's core files. Must end with a slash.")
-
-(defconst doom-modules-dir (concat doom-emacs-dir "modules/")
-  "The root directory for Doom's modules. Must end with a slash.")
-
-(defconst doom-local-dir
-  (if-let (localdir (getenv "DOOMLOCALDIR"))
-      (expand-file-name (file-name-as-directory localdir))
-    (concat doom-emacs-dir ".local/"))
-  "Root directory for local storage.
-
-Use this as a storage location for this system's installation of Doom Emacs.
-These files should not be shared across systems. By default, it is used by
-`doom-etc-dir' and `doom-cache-dir'. Must end with a slash.")
-
-(defconst doom-etc-dir (concat doom-local-dir "etc/")
-  "Directory for non-volatile local storage.
-
-Use this for files that don't change much, like server binaries, external
-dependencies or long-term shared data. Must end with a slash.")
-
-(defconst doom-cache-dir (concat doom-local-dir "cache/")
-  "Directory for volatile local storage.
-
-Use this for files that change often, like cache files. Must end with a slash.")
-
-(defconst doom-docs-dir (concat doom-emacs-dir "docs/")
-  "Where Doom's documentation files are stored. Must end with a slash.")
-
-(defconst doom-private-dir
-  (if-let (doomdir (getenv "DOOMDIR"))
-      (expand-file-name (file-name-as-directory doomdir))
-    (or (let ((xdgdir
-               (expand-file-name "doom/"
-                                 (or (getenv "XDG_CONFIG_HOME")
-                                     "~/.config"))))
-          (if (file-directory-p xdgdir) xdgdir))
-        "~/.doom.d/"))
-  "Where your private configuration is placed.
-
-Defaults to ~/.config/doom, ~/.doom.d or the value of the DOOMDIR envvar;
-whichever is found first. Must end in a slash.")
-
-(defconst doom-autoload-file (concat doom-local-dir "autoloads.el")
-  "Where `doom-reload-core-autoloads' stores its core autoloads.
-
-This file is responsible for informing Emacs where to find all of Doom's
-autoloaded core functions (in core/autoload/*.el).")
-
-(defconst doom-env-file (concat doom-local-dir "env")
-  "The location of your envvar file, generated by `doom env`.
-
-This file contains environment variables scraped from your shell environment,
-which is loaded at startup (if it exists). This is helpful if Emacs can't
-\(easily) be launched from the correct shell session (particularly for MacOS
-users).")
+;; satisfy the compiler
+(defvar apropos-do-all)
+(defvar gnutls-verify-error)
+(defvar gnutls-algorithm-priority)
+(defvar gnutls-min-prime-bits)
+(defvar tls-checktrust)
+(defvar tls-program)
+(defvar async-byte-compile-log-file)
+(defvar bookmark-default-file)
+(defvar desktop-dirname)
+(defvar desktop-base-file-name)
+(defvar desktop-base-lock-name)
+(defvar pcache-directory)
+(defvar request-storage-directory)
+(defvar tramp-auto-save-directory)
+(defvar tramp-backup-directory-alist)
+(defvar tramp-persistency-file-name)
+(defvar url-cache-directory)
+(defvar url-configuration-directory)
+(defvar gamegrid-user-score-file-directory)
+(defvar ffap-machine-p-known)
+(defvar gcmh-idle-delay)
+(defvar gcmh-high-cons-threshold)
+(defvar gcmh-verbose)
 
 ;;; Custom error types
 (define-error 'doom-error "Error in Doom Emacs core")
@@ -204,30 +133,6 @@ users).")
 ;; slightly from 0.5s:
 (setq idle-update-delay 1.0)
 
-
-;; satisfy the compiler
-(defvar gnutls-verify-error)
-(defvar gnutls-algorithm-priority)
-(defvar gnutls-min-prime-bits)
-(defvar tls-checktrust)
-(defvar tls-program)
-(defvar async-byte-compile-log-file)
-(defvar bookmark-default-file)
-(defvar desktop-dirname)
-(defvar desktop-base-file-name)
-(defvar desktop-base-lock-name)
-(defvar pcache-directory)
-(defvar request-storage-directory)
-(defvar tramp-auto-save-directory)
-(defvar tramp-backup-directory-alist)
-(defvar tramp-persistency-file-name)
-(defvar url-cache-directory)
-(defvar url-configuration-directory)
-(defvar gamegrid-user-score-file-directory)
-(defvar ffap-machine-p-known)
-(defvar gcmh-idle-delay)
-(defvar gcmh-high-cons-threshold)
-(defvar gcmh-verbose)
 
 ;; Emacs is essentially one huge security vulnerability, what with all the
 ;; dependencies it pulls in from all corners of the globe. Let's try to be at
@@ -363,9 +268,10 @@ config.el instead."
 
 ;; Adopt a sneaky garbage collection strategy of waiting until idle time to
 ;; collect; staving off the collector while the user is working.
-(setq gcmh-idle-delay 5
-      gcmh-high-cons-threshold (* 16 1024 1024)  ; 16mb
-      gcmh-verbose doom-debug-p)
+(with-eval-after-load 'gcmh
+  (setq gcmh-idle-delay 5
+        gcmh-high-cons-threshold (* 16 1024 1024) ; 16mb
+        gcmh-verbose doom-debug-p))
 
 ;; HACK `tty-run-terminal-initialization' is *tremendously* slow for some
 ;;      reason. Disabling it completely could have many side-effects, so we

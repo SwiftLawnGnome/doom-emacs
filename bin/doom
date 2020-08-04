@@ -25,6 +25,7 @@
            (expand-file-name "../" loaddir)))))
 
   ;;
+  (load (expand-file-name "core/core-vars.el" user-emacs-directory) nil t)
   (load (expand-file-name "core/core.el" user-emacs-directory) nil t)
 
   ;; HACK Load `cl' and site files manually so we can stop them from polluting

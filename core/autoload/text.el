@@ -83,7 +83,7 @@ Uses `evil-visual-beginning' if available."
 Uses `evil-visual-end' if available."
   (declare (side-effect-free t))
   (if (bound-and-true-p evil-local-mode)
-      evil-visual-end
+      (bound-and-true-p evil-visual-end)
     (region-end)))
 
 ;;;###autoload

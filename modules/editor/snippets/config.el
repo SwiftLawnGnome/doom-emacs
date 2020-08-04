@@ -1,5 +1,11 @@
 ;;; editor/snippets/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-lib)
+  (require 'core-modules)
+  (require 'use-package))
+(require 'core-vars)
+
 (defvar +snippets-dir (expand-file-name "snippets/" doom-private-dir)
   "Directory where `yasnippet' will search for your private snippets.")
 
@@ -89,9 +95,7 @@
 
   ;; REVIEW Fix #2639: For some reason `yas--all-templates' returns duplicates
   ;;        of some templates. Until I figure out the real cause this fixes it.
-  (defadvice! +snippets--remove-duplicates-a (templates)
-    :filter-return #'yas--all-templates
-    (cl-delete-duplicates templates :test #'equal))
+  (advice-add 'yas--all-templates :filter-return #'delete-dups)
 
   ;; HACK Smartparens will interfere with snippets expanded by `hippie-expand`,
   ;;      so temporarily disable smartparens during snippet expansion.

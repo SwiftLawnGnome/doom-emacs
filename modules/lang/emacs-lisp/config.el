@@ -1,5 +1,15 @@
 ;;; lang/emacs-lisp/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'use-package)
+  (require 'core-modules)
+  (require 'core-keybinds)
+  (require 'core-projects))
+
+(defvar doom-detect-indentation-excluded-modes)
+(defvar auto-minor-mode-alist)
+(defvar auto-minor-mode-magic-alist)
+
 (defvar +emacs-lisp-enable-extra-fontification t
   "If non-nil, highlight special forms, and defined functions and variables.")
 
@@ -32,7 +42,8 @@ employed so that flycheck still does *some* helpful linting.")
   (set-lookup-handlers! '(emacs-lisp-mode lisp-interaction-mode helpful-mode)
     :definition    #'+emacs-lisp-lookup-definition
     :documentation #'+emacs-lisp-lookup-documentation)
-  (set-docsets! '(emacs-lisp-mode lisp-interaction-mode) "Emacs Lisp")
+  (set-docsets! '(emacs-lisp-mode lisp-interaction-mode)
+    "Emacs Lisp" "Emacs-CL" "emacs")
   (set-pretty-symbols! 'emacs-lisp-mode :lambda "lambda")
   (set-rotate-patterns! 'emacs-lisp-mode
     :symbols '(("t" "nil")

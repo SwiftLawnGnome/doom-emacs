@@ -24,5 +24,5 @@
 (defun +haskell/evil-open-below ()
   "Opens a line below the current mode"
   (interactive)
-  (evil-append-line nil)
+  (when (fboundp 'evil-append-line) (evil-append-line nil))
   (haskell-indentation-newline-and-indent))

@@ -1,5 +1,7 @@
 ;;; core/cli/help.el -*- lexical-binding: t; -*-
 
+(require 'core-lib)
+
 (defun doom--cli-print-signature (cli)
   (print! (bold "Usage: doom %s%s%s")
           (if (doom-cli-internal-p cli)
@@ -8,8 +10,8 @@
           (if-let* ((optlist (doom-cli-optlist cli))
                     (flags (cl-loop for opt in optlist
                                     append (doom-cli-option-flags opt)))
-                    (fn (doom-partial #'string-prefix-p "--")))
-              (concat (when-let (short-flags (cl-remove-if fn flags))
+                    (fn (apply-partially #'string-prefix-p "--")))
+              (concat (when-let (short-flags (doom-remove fn flags))
                         ;; TODO Show arguments of short flags
                         (format "[-%s]"
                                 (string-join (mapcar (doom-rpartial #'substring 1 nil) short-flags)

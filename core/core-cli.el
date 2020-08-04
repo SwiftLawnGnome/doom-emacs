@@ -203,12 +203,13 @@ BODY will be run when this dispatcher is called."
     (push docstring body)
     (setq docstring "TODO"))
   (let ((names (doom-enlist name))
-        (optlist (cl-remove-if-not #'listp speclist))
-        (arglist (cl-remove-if #'listp speclist))
-        (plist (cl-loop for (key val) on body by #'cddr
-                        if (keywordp key)
-                        nconc (list key val) into plist
-                        else return plist)))
+        (optlist (doom-keep #'listp speclist))
+        (arglist (doom-remove #'listp speclist))
+        (plist (cl-loop
+                  for (key val) on body by #'cddr
+                  while (keywordp key)
+                  collect key
+                  collect val)))
     `(let ((name ',(car names))
            (aliases ',(cdr names))
            (plist ',plist))
@@ -231,9 +232,8 @@ BODY will be run when this dispatcher is called."
                                         collect (list optsym `(cdr (assq ',optsym --alist--))))
                            ,@body)))
         doom--cli-commands)
-       (when aliases
-         (mapc (doom-rpartial #'puthash name doom--cli-commands)
-               aliases)))))
+       (dolist (alias aliases)
+         (puthash alias name doom--cli-commands)))))
 
 (defmacro defcligroup! (name docstring &rest body)
   "Declare all enclosed cli commands are part of the NAME group."

@@ -1,14 +1,60 @@
 ;;; ui/popup/autoload/popup.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(eval-when-compile (require 'core-lib))
 (defvar +popup--internal nil)
+(defvar +popup--last)
+(defvar +popup-defaults)
+(defvar +popup-default-parameters)
+(defvar +popup--timer)
+(defvar +popup--inhibit-transient)
+(defvar +popup-default-alist)
+(defvar +popup--remember-last)
+(defvar +popup--inhibit-select)
+(defvar +popup-mode)
+(defvar +popup-default-display-buffer-actions)
+(defvar +popup-margin-width)
+(defvar +popup--display-buffer-alist)
+
+
+;;;###autodef
+(defmacro with-popup-rules! (rules &rest body)
+  "Evaluate BODY with popup RULES. RULES is a list of popup rules. Each rule
+should match the arguments of `+popup-define' or the :popup setting."
+  (declare (indent defun))
+  `(let ((+popup--display-buffer-alist +popup--old-display-buffer-alist)
+         display-buffer-alist)
+     (set-popup-rules! ,rules)
+     (when (bound-and-true-p +popup-mode)
+       (setq display-buffer-alist +popup--display-buffer-alist))
+     ,@body))
+
+;;;###autodef
+(defmacro save-popups! (&rest body)
+  "Sets aside all popups before executing the original function, usually to
+prevent the popup(s) from messing up the UI (or vice versa)."
+  `(let* ((in-popup-p (+popup-buffer-p))
+          (popups (+popup-windows))
+          (+popup--inhibit-transient t)
+          buffer-list-update-hook
+          +popup--last)
+     (dolist (p popups)
+       (+popup/close p 'force))
+     (unwind-protect
+         (progn ,@body)
+       (when popups
+         (let ((origin (selected-window)))
+           (+popup/restore)
+           (unless in-popup-p
+             (select-window origin)))))))
 
 (defun +popup--remember (windows)
   "Remember WINDOWS (a list of windows) for later restoration."
   (cl-assert (cl-every #'windowp windows) t)
   (setq +popup--last
         (cl-loop for w in windows
-                 collect (cons (window-buffer w)
-                               (window-state-get w)))))
+           collect (cons (window-buffer w)
+                         (window-state-get w)))))
 
 (defun +popup--kill-buffer (buffer ttl)
   "Tries to kill BUFFER, as was requested by a transient timer. If it fails, eg.
@@ -103,7 +149,7 @@ the buffer is visible, then set another timer and try again later."
                   (param (if (memq side '(left right))
                              'window-width
                            'window-height)))
-        (setq list (assq-delete-all 'size alist))
+        (setq alist (assq-delete-all 'size alist))
         (setf (alist-get param alist) size))
       (setf (alist-get 'window-parameters alist)
             parameters)

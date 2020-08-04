@@ -1,5 +1,19 @@
 ;;; core/autoload/config.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(require 'core)
+
+(eval-and-compile
+  (autoload 'doom-autoloads-reload (concat doom-core-dir "cli/autoloads")))
+
+(eval-when-compile
+  (autoload 'doom-project-browse "projects")
+  (autoload 'doom-project-find-file "projects")
+  (autoload 'doom-initialize-modules "core-modules")
+  (autoload 'doom-initialize-packages "core-packages")
+  (autoload 'doom/restart-and-restore "sessions")
+  (autoload 'general-auto-unbind-keys "general"))
+
 (defvar doom-bin-dir (concat doom-emacs-dir "bin/"))
 (defvar doom-bin (concat doom-bin-dir "doom"))
 

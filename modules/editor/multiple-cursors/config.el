@@ -1,5 +1,10 @@
 ;;; editor/multiple-cursors/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-lib)
+  (require 'core-modules)
+  (require 'use-package))
+
 (defvar +multiple-cursors-evil-mc-ex-global t
   "TODO")
 
@@ -164,7 +169,7 @@
       (defun +multiple-cursors-compat-back-to-previous-state-h ()
         (when +mc--compat-evil-prev-state
           (unwind-protect
-              (case +mc--compat-evil-prev-state
+              (cl-case +mc--compat-evil-prev-state
                 ((normal visual) (evil-force-normal-state))
                 (t (message "Don't know how to handle previous state: %S"
                             +mc--compat-evil-prev-state)))
@@ -183,7 +188,7 @@
 
     (add-hook! 'rectangular-region-mode-hook
       (defun +multiple-cursors-evil-compat-rect-switch-state-h ()
-        (if rectangular-region-mode
+        (if (bound-and-true-p rectangular-region-mode)
             (+multiple-cursors-compat-switch-to-emacs-state-h)
           (setq +mc--compat-evil-prev-state nil))))
 

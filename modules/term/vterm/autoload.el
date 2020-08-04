@@ -1,5 +1,7 @@
 ;;; term/vterm/autoload.el -*- lexical-binding: t; -*-
 
+(eval-when-compile (require 'tramp))
+
 ;;;###autoload
 (defun +vterm/toggle (arg)
   "Toggles a terminal popup window at project root.

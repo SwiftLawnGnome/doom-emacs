@@ -7,6 +7,14 @@
 ;;
 ;; NOTE persp-mode requires `workgroups' for file persistence in Emacs 24.4.
 
+(eval-when-compile
+  (require 'use-package)
+  (require 'core-modules)
+  (require 'cl-lib))
+
+(defvar projectile-switch-project-action)
+(defvar counsel-projectile-switch-project-action)
+
 (defvar +workspaces-main "main"
   "The name of the primary and initial workspace, which cannot be deleted.")
 
@@ -157,29 +165,31 @@ stored in `persp-save-dir'.")
   (add-hook 'delete-frame-functions #'+workspaces-delete-associated-workspace-h)
 
   ;; per-project workspaces, but reuse current workspace if empty
-  (setq projectile-switch-project-action #'+workspaces-set-project-action-fn
-        counsel-projectile-switch-project-action
-        '(1 ("o" +workspaces-switch-to-project-h "open project in new workspace")
-            ("O" counsel-projectile-switch-project-action "jump to a project buffer or file")
-            ("f" counsel-projectile-switch-project-action-find-file "jump to a project file")
-            ("d" counsel-projectile-switch-project-action-find-dir "jump to a project directory")
-            ("b" counsel-projectile-switch-project-action-switch-to-buffer "jump to a project buffer")
-            ("m" counsel-projectile-switch-project-action-find-file-manually "find file manually from project root")
-            ("w" counsel-projectile-switch-project-action-save-all-buffers "save all project buffers")
-            ("k" counsel-projectile-switch-project-action-kill-buffers "kill all project buffers")
-            ("r" counsel-projectile-switch-project-action-remove-known-project "remove project from known projects")
-            ("c" counsel-projectile-switch-project-action-compile "run project compilation command")
-            ("C" counsel-projectile-switch-project-action-configure "run project configure command")
-            ("e" counsel-projectile-switch-project-action-edit-dir-locals "edit project dir-locals")
-            ("v" counsel-projectile-switch-project-action-vc "open project in vc-dir / magit / monky")
-            ("s" (lambda (project)
-                   (let ((projectile-switch-project-action
-                          (lambda () (call-interactively #'+ivy/project-search))))
-                     (counsel-projectile-switch-project-by-name project))) "search project")
-            ("xs" counsel-projectile-switch-project-action-run-shell "invoke shell from project root")
-            ("xe" counsel-projectile-switch-project-action-run-eshell "invoke eshell from project root")
-            ("xt" counsel-projectile-switch-project-action-run-term "invoke term from project root")
-            ("X" counsel-projectile-switch-project-action-org-capture "org-capture into project")))
+  (setq projectile-switch-project-action #'+workspaces-set-project-action-fn)
+  (with-eval-after-load 'counsel-projectile
+    (defun +workspaces-counsel-projectile-switch-project (project)
+      (let ((projectile-switch-project-action
+             (lambda () (call-interactively #'+ivy/project-search))))
+        (counsel-projectile-switch-project-by-name project)))
+    (setq counsel-projectile-switch-project-action
+          `(1 ("o" +workspaces-switch-to-project-h "open project in new workspace")
+              ("O" counsel-projectile-switch-project-action "jump to a project buffer or file")
+              ("f" counsel-projectile-switch-project-action-find-file "jump to a project file")
+              ("d" counsel-projectile-switch-project-action-find-dir "jump to a project directory")
+              ("b" counsel-projectile-switch-project-action-switch-to-buffer "jump to a project buffer")
+              ("m" counsel-projectile-switch-project-action-find-file-manually "find file manually from project root")
+              ("w" counsel-projectile-switch-project-action-save-all-buffers "save all project buffers")
+              ("k" counsel-projectile-switch-project-action-kill-buffers "kill all project buffers")
+              ("r" counsel-projectile-switch-project-action-remove-known-project "remove project from known projects")
+              ("c" counsel-projectile-switch-project-action-compile "run project compilation command")
+              ("C" counsel-projectile-switch-project-action-configure "run project configure command")
+              ("e" counsel-projectile-switch-project-action-edit-dir-locals "edit project dir-locals")
+              ("v" counsel-projectile-switch-project-action-vc "open project in vc-dir / magit / monky")
+              ("s" +workspaces-counsel-projectile-switch-project "search project")
+              ("xs" counsel-projectile-switch-project-action-run-shell "invoke shell from project root")
+              ("xe" counsel-projectile-switch-project-action-run-eshell "invoke eshell from project root")
+              ("xt" counsel-projectile-switch-project-action-run-term "invoke term from project root")
+              ("X" counsel-projectile-switch-project-action-org-capture "org-capture into project"))))
 
   (when (featurep! :completion helm)
     (after! helm-projectile
@@ -222,12 +232,10 @@ stored in `persp-save-dir'.")
    :save-function (lambda (buf tag vars)
                     (list tag (buffer-name buf) vars
                           (buffer-name (buffer-base-buffer buf))))
-   :load-function (lambda (savelist &rest _rest)
-                    (cl-destructuring-bind (buf-name _vars base-buf-name &rest _)
-                        (cdr savelist)
-                      (push (cons buf-name base-buf-name)
-                            +workspaces--indirect-buffers-to-restore)
-                      nil)))
+   :load-function (fn! ((_ buf-name _ base-buf-name . ignored) &rest rest)
+                    (push (cons buf-name base-buf-name)
+                          +workspaces--indirect-buffers-to-restore)
+                    nil))
   (add-hook! 'persp-after-load-state-functions
     (defun +workspaces-reload-indirect-buffers-h (&rest _)
       (dolist (ibc +workspaces--indirect-buffers-to-restore)
@@ -235,5 +243,5 @@ stored in `persp-save-dir'.")
           (when (buffer-live-p (get-buffer base-buffer-name))
             (when (get-buffer buffer-name)
               (setq buffer-name (generate-new-buffer-name buffer-name)))
-            (make-indirect-buffer bb buffer-name t))))
+            (make-indirect-buffer base-buffer-name buffer-name t))))
       (setq +workspaces--indirect-buffers-to-restore nil))))

@@ -1,5 +1,16 @@
 ;;; core/cli/autoloads.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+
+(declare-function print! "output")
+(defvar straight--build-cache)
+(eval-when-compile
+  (load (concat doom-emacs-dir "core/autoload/output.el") nil t)
+  (require 'core-lib)
+  ;; ppss accessors
+  ;; `eval-when-compile' cuz compiler macro
+  (require 'syntax))
+
 (defvar doom-autoloads-excluded-packages '("gh")
   "What packages whose autoloads file we won't index.
 
@@ -34,7 +45,7 @@ one wants that.")
    (and (print! (start "Generating autoloads file..."))
         (doom-autoloads--write
          file
-         `((unless (equal emacs-major-version ,emacs-major-version)
+         `((unless (= emacs-major-version ,emacs-major-version)
              (signal 'doom-error
                      (list "The installed version of Emacs has changed since last 'doom sync' ran"
                            "Run 'doom sync && doom build' to bring Doom up to speed")))
@@ -45,13 +56,13 @@ one wants that.")
          (mapcar (lambda (var) `(set ',var ',(symbol-value var)))
                  doom-autoloads-cached-vars)
          (doom-autoloads--scan
-          (append (cl-loop for dir
-                           in (append (list doom-core-dir)
-                                      (cdr (doom-module-load-path 'all-p))
-                                      (list doom-private-dir))
-                           if (doom-glob dir "autoload.el") collect it
-                           if (doom-glob dir "autoload/*.el") append it)
-                  (mapcan #'doom-glob doom-autoloads-files)))
+          (nconc (cl-loop
+                    for dir in (cons doom-core-dir
+                                     (nconc (cdr (doom-module-load-path 'all-p))
+                                            (list doom-private-dir)))
+                    if (doom-glob dir "autoload.el") collect it
+                    if (doom-glob dir "autoload/*.el") nconc it)
+                 (mapcan #'doom-glob doom-autoloads-files)))
          (doom-autoloads--scan
           (mapcar #'straight--autoloads-file
                   (seq-difference (hash-table-keys straight--build-cache)
@@ -131,25 +142,36 @@ one wants that.")
                    (print
                     (if altform
                         (read altform)
-                      (append
-                       (list (pcase definer
-                               (`defun 'defmacro)
-                               (`cl-defun `cl-defmacro)
-                               (_ type))
-                             symbol arglist
-                             (format "THIS FUNCTION DOES NOTHING BECAUSE %s IS DISABLED\n\n%s"
-                                     module
-                                     (if (stringp (car body))
-                                         (pop body)
-                                       "No documentation.")))
-                       (cl-loop for arg in arglist
-                                if (and (symbolp arg)
-                                        (not (keywordp arg))
-                                        (not (memq arg cl--lambda-list-keywords)))
-                                collect arg into syms
-                                else if (listp arg)
-                                collect (car arg) into syms
-                                finally return (if syms `((ignore ,@syms)))))))))
+                      ;; (nconc
+                      ;;  (list (pcase definer
+                      ;;          (`defun 'defmacro)
+                      ;;          (`cl-defun `cl-defmacro)
+                      ;;          (_ definer))
+                      ;;        symbol arglist
+                      ;;        (format "THIS FUNCTION DOES NOTHING BECAUSE %s IS DISABLED\n\n%s"
+                      ;;                module
+                      ;;                (if (stringp (car body))
+                      ;;                    (pop body)
+                      ;;                  "No documentation.")))
+                      ;;  (cl-loop for arg in arglist
+                      ;;     if (and (symbolp arg)
+                      ;;             (not (keywordp arg))
+                      ;;             (not (memq arg cl--lambda-list-keywords)))
+                      ;;     collect arg into syms
+                      ;;     else if (listp arg)
+                      ;;     collect (car arg) into syms
+                      ;;     finally return (if syms `((ignore ,@syms)))))
+                      `(,(pcase definer
+                           (`defun 'defmacro)
+                           (`cl-defun 'cl-defmacro)
+                           (_ definer))
+                         ,symbol ,arglist
+                         ,(format "THIS FUNCTION DOES NOTHING BECAUSE %s IS DISABLED\n\n%s"
+                                  module
+                                  (if (stringp (car body))
+                                      (pop body)
+                                    "No documentation."))
+                         ,@(if-let (vars (cl--arglist-args arglist)) `((ignore ,@vars))))))))
                (print `(put ',symbol 'doom-module ',module)))
               ((eq definer 'defalias)
                (cl-destructuring-bind (_ _ target &optional docstring) form
@@ -194,32 +216,31 @@ one wants that.")
 (defun doom-autoloads--scan (files &optional literal)
   (require 'autoload)
   (let (autoloads)
-    (dolist (file
-             (seq-filter #'file-readable-p files)
-             (nreverse (delq nil autoloads)))
-      (with-temp-buffer
-        (print! (debug "- Scanning %s") (relpath file doom-emacs-dir))
-        (if literal
-            (insert-file-contents file)
-          (doom-autoloads--scan-file file))
-        (save-excursion
-          (let ((filestr (prin1-to-string file)))
-            (while (re-search-forward "\\_<load-file-name\\_>" nil t)
-              ;; `load-file-name' is meaningless in a concatenated
-              ;; mega-autoloads file, so we replace references to it with the
-              ;; file they came from.
-              (let ((ppss (save-excursion (syntax-ppss))))
-                (or (nth 3 ppss)
-                    (nth 4 ppss)
-                    (replace-match filestr t t))))))
-        (let ((load-file-name file)
-              (load-path
-               (append (list doom-private-dir)
-                       doom-modules-dirs
-                       load-path)))
-          (condition-case _
-              (while t
-                (push (doom-autoloads--cleanup-form (read (current-buffer))
-                                                    (not literal))
-                      autoloads))
-            (end-of-file)))))))
+    (dolist (file files (nreverse (delq nil autoloads)))
+      (when (file-readable-p file)
+        (with-temp-buffer
+          (print! (debug "- Scanning %s") (relpath file doom-emacs-dir))
+          (if literal
+              (insert-file-contents file)
+            (doom-autoloads--scan-file file))
+          (save-excursion
+            (let ((filestr (prin1-to-string file)))
+              (while (re-search-forward "\\_<load-file-name\\_>" nil t)
+                ;; `load-file-name' is meaningless in a concatenated
+                ;; mega-autoloads file, so we replace references to it with the
+                ;; file they came from.
+                (let ((ppss (save-excursion (syntax-ppss))))
+                  (or (ppss-string-terminator ppss)
+                      (ppss-comment-depth ppss)
+                      (replace-match filestr t t))))))
+          (let ((load-file-name file)
+                (load-path
+                 (append (list doom-private-dir)
+                         (bound-and-true-p doom-modules-dirs)
+                         load-path)))
+            (condition-case nil
+                (while t
+                  (push (doom-autoloads--cleanup-form (read (current-buffer))
+                                                      (not literal))
+                        autoloads))
+              (end-of-file))))))))

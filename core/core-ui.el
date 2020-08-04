@@ -1,5 +1,19 @@
 ;;; core-ui.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(require 'core-lib)
+(eval-when-compile
+  (require 'core-modules)
+  (require 'use-package)
+  (autoload 'doom-real-buffer-p "buffers")
+  (autoload 'doom-fallback-buffer "buffers")
+  (autoload 'doom-quit-p "ui"))
+
+(defvar ansi-color-for-comint-mode)
+(defvar whitespace-mode)
+(defvar image-animate-loop)
+(defvar rainbow-delimiters-max-face-count)
+
 ;;
 ;;; Variables
 
@@ -145,7 +159,8 @@ or if the current buffer is read-only or not file-visiting."
     (require 'whitespace)
     (set (make-local-variable 'whitespace-style)
          (let ((style (if indent-tabs-mode '(indentation) '(tabs tab-mark))))
-           (if whitespace-mode
+           (if (and (bound-and-true-p whitespace-mode)
+                    (boundp 'whitespace-active-style))
                (cl-union style whitespace-active-style)
              style)))
     (cl-pushnew 'face whitespace-style)
@@ -199,8 +214,10 @@ or if the current buffer is read-only or not file-visiting."
 
 (when IS-MAC
   ;; sane trackpad/mouse scroll settings
-  (setq mac-redisplay-dont-reset-vscroll t
-        mac-mouse-wheel-smooth-scroll nil))
+  (and (boundp 'mac-redisplay-dont-reset-vscroll)
+       (boundp 'mac-mouse-wheel-smooth-scroll)
+       (setq mac-redisplay-dont-reset-vscroll t
+             mac-mouse-wheel-smooth-scroll nil)))
 
 
 ;;
@@ -466,14 +483,18 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
 
 
 ;;;###package whitespace
-(setq whitespace-line-column nil
-      whitespace-style
-      '(face indentation tabs tab-mark spaces space-mark newline newline-mark
-        trailing lines-tail)
-      whitespace-display-mappings
-      '((tab-mark ?\t [?› ?\t])
-        (newline-mark ?\n [?¬ ?\n])
-        (space-mark ?\  [?·] [?.])))
+(with-eval-after-load 'whitespace
+  (defvar whitespace-line-column)
+  (defvar whitespace-style)
+  (defvar whitespace-display-mappings)
+  (setq whitespace-line-column nil
+        whitespace-style
+        '(face indentation tabs tab-mark spaces space-mark newline newline-mark
+          trailing lines-tail)
+        whitespace-display-mappings
+        '((tab-mark ?\t [?› ?\t])
+          (newline-mark ?\n [?¬ ?\n])
+          (space-mark ?\  [?·] [?.]))))
 
 
 ;;
@@ -522,12 +543,14 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
   :config (setq highlight-numbers-generic-regexp "\\_<[[:digit:]]+\\(?:\\.[0-9]*\\)?\\_>"))
 
 ;;;###package image
-(setq image-animate-loop t)
+(with-eval-after-load 'image-mode
+  (setq image-animate-loop t))
 
 ;;;###package rainbow-delimiters
 ;; Helps us distinguish stacked delimiter pairs, especially in parentheses-drunk
 ;; languages like Lisp.
-(setq rainbow-delimiters-max-face-count 3)
+(with-eval-after-load 'rainbow-delimiters
+  (setq rainbow-delimiters-max-face-count 6))
 
 
 ;;
@@ -671,7 +694,9 @@ This offers a moderate boost in startup (or theme switch) time, so long as
   ;; These should be done as late as possible, as not to prematurely trigger
   ;; hooks during startup.
   (add-hook 'buffer-list-update-hook #'doom-run-switch-window-hooks-h)
-  (add-hook 'focus-in-hook #'doom-run-switch-frame-hooks-h)
+  ;; (add-hook 'focus-in-hook #'doom-run-switch-frame-hooks-h)
+  (add-function :after after-focus-change-function
+                #'doom-run-switch-frame-hooks-h)
   (dolist (fn '(switch-to-next-buffer switch-to-prev-buffer))
     (advice-add fn :around #'doom-run-switch-to-next-prev-buffer-hooks-a))
   (dolist (fn '(switch-to-buffer display-buffer))

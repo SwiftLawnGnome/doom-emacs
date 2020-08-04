@@ -1,5 +1,59 @@
 ;;; core-editor.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'recentf) ;; cuz `recentf-add-file' is a defsubst
+  (require 'core-lib)
+  (require 'use-package))
+(eval-and-compile (require 'core-modules))
+(require 'core-vars)
+
+;; compiler
+(defvar tabify-regexp)
+(defvar server-name)
+(defvar evil--jumps-jumping)
+(defvar better-jumper--jumping)
+(declare-function global-clipetty-mode "clipetty")
+(declare-function doom-init-clipboard-in-tty-emacs-h "core-editor")
+(declare-function doom-visible-buffers "buffers")
+(declare-function doom--recentf-touch-buffer-h "core-editor")
+(declare-function doom--recentf-add-dired-directory-h "core-editor")
+(declare-function doom-shut-up-a "ui")
+(declare-function doom-unpropertize-kill-ring-h "core-editor")
+(declare-function doom--recenter-on-load-saveplace-a "core-editor")
+(declare-function doom--inhibit-saveplace-in-long-files-a "core-editor")
+(declare-function doom--dont-prettify-saveplace-cache-a "core-editor")
+(declare-function smie-config--guess "smie")
+(declare-function smie-config-guess "smie")
+(declare-function doom--fix-broken-smie-modes-a "straight")
+(declare-function doom-init-smartparens-in-minibuffer-maybe-h "yasnippet")
+(declare-function doom-enable-smartparens-mode-maybe-h "yasnippet")
+(declare-function doom-disable-smartparens-mode-maybe-h "yasnippet")
+(declare-function doom-buffer-has-long-lines-p "core-editor")
+(declare-function recentf-cleanup "recentf")
+(declare-function better-jumper-set-jump "better-jumper")
+(declare-function better-jumper-jump-forward "better-jumper")
+(declare-function better-jumper-jump-backward "better-jumper")
+(declare-function dtrt-indent-mode "dtrt-indent")
+(declare-function smartparens-mode "smartparens")
+(declare-function turn-on-smartparens-mode "smartparens")
+(declare-function turn-off-smartparens-mode "smartparens")
+(declare-function so-long-detected-long-line-p "so-long")
+(declare-function doom-auto-revert-buffers-h "core-editor")
+(declare-function doom-auto-revert-buffer-h "core-editor")
+(declare-function doom-set-jump-maybe-a "core-editor")
+(declare-function doom-set-jump-h "core-editor")
+
+
+(eval-when-compile
+  (autoload 'server-running-p "server")
+  (autoload 'better-jumper-set-jump "better-jumper")
+  (autoload 'turn-on-smartparens-mode "smartparens")
+  (autoload 'turn-off-smartparens-mode "smartparens")
+  (autoload 'smartparens-mode "smartparens")
+  (autoload 'dtrt-indent-mode "dtrt-indent")
+  (autoload 'so-long-detected-long-line-p "so-long"))
+
+
 (defvar doom-detect-indentation-excluded-modes '(fundamental-mode so-long-mode)
   "A list of major modes in which indentation should be automatically
 detected.")
@@ -114,7 +168,8 @@ possible."
 
 ;; Make `tabify' and `untabify' only affect indentation. Not tabs/spaces in the
 ;; middle of a line.
-(setq tabify-regexp "^\t* [ \t]+")
+(with-eval-after-load 'tabify
+  (setq tabify-regexp "^\t* [ \t]+"))
 
 ;; An archaic default in the age of widescreen 4k displays? I disagree. We still
 ;; frequently split our terminals and editor frames, or have them side-by-side,
@@ -172,12 +227,12 @@ possible."
 ;;
 ;;; Extra file extensions to support
 
-(nconc
- auto-mode-alist
- '(("/LICENSE\\'" . text-mode)
-   ("\\.log\\'" . text-mode)
-   ("rc\\'" . conf-mode)
-   ("\\.\\(?:hex\\|nes\\)\\'" . hexl-mode)))
+(setq auto-mode-alist
+      (nconc auto-mode-alist
+             '(("/LICENSE\\'" . text-mode)
+               ("\\.log\\'" . text-mode)
+               ("rc\\'" . conf-mode)
+               ("\\.\\(?:hex\\|nes\\)\\'" . hexl-mode))))
 
 
 ;;
@@ -185,12 +240,17 @@ possible."
 
 (use-package! autorevert
   ;; revert buffers when their files/state have changed
-  :hook (focus-in . doom-auto-revert-buffers-h)
-  :hook (after-save . doom-auto-revert-buffers-h)
-  :hook (doom-switch-buffer . doom-auto-revert-buffer-h)
-  :hook (doom-switch-window . doom-auto-revert-buffer-h)
+  :init
+  (add-hook 'after-save-hook #'doom-auto-revert-buffers-h)
+  (add-hook 'doom-switch-buffer-hook #'doom-auto-revert-buffer-h)
+  (add-hook 'doom-switch-window-hook #'doom-auto-revert-buffer-h)
+  (if (fboundp 'after-focus-change-function)
+      (add-function :after after-focus-change-function
+                    #'doom-auto-revert-buffer-h)
+    (with-suppressed-warnings ((obsolete focus-in-hook))
+      (add-hook 'focus-in-hook #'doom-auto-revert-buffer-h)))
   :config
-  (setq auto-revert-verbose t ; let us know when it happens
+  (setq auto-revert-verbose t           ; let us know when it happens
         auto-revert-use-notify nil
         auto-revert-stop-on-user-input nil
         ;; Only prompts for confirmation when buffer is unsaved.
@@ -205,8 +265,8 @@ possible."
   ;; which is unreliable and expensive with a lot of buffers open.
   (defun doom-auto-revert-buffer-h ()
     "Auto revert current buffer, if necessary."
-    (unless (or auto-revert-mode (active-minibuffer-window))
-      (auto-revert-handler)))
+    (or auto-revert-mode (active-minibuffer-window)
+        (bound! (#'auto-revert-handler) (auto-revert-handler))))
 
   (defun doom-auto-revert-buffers-h ()
     "Auto revert stale buffers in visible windows, if necessary."
@@ -214,12 +274,12 @@ possible."
       (with-current-buffer buf
         (doom-auto-revert-buffer-h)))))
 
-
 (use-package! recentf
   ;; Keep track of recently opened files
   :defer-incrementally easymenu tree-widget timer
   :hook (doom-first-file . recentf-mode)
-  :commands recentf-open-files
+  :init
+  :commands recentf-open-files recentf-load-list
   :config
   (defun doom--recent-file-truename (file)
     (if (or (file-remote-p file nil t)
@@ -295,56 +355,68 @@ files, so we replace calls to `pp' with the much faster `prin1'."
     :around #'save-place-alist-to-file
     (letf! ((#'pp #'prin1)) (funcall orig-fn))))
 
-
-(use-package! server
-  :when (display-graphic-p)
-  :after-call pre-command-hook after-find-file focus-out-hook
-  :defer 1
-  :init
-  (when-let (name (getenv "EMACS_SERVER_NAME"))
-    (setq server-name name))
-  :config
-  (unless (server-running-p)
-    (server-start)))
+(when (display-graphic-p)
+  (use-package! server
+    :defer 1
+    :init
+    (when-let (name (getenv "EMACS_SERVER_NAME"))
+      (setq server-name name))
+    :config
+    (unless (server-running-p) (server-start)))
+  (if (fboundp 'after-focus-change-function)
+      (use-package! server
+        :no-require t
+        :after-call
+        pre-command-hook
+        after-find-file
+        after-focus-change-function)
+    (with-suppressed-warnings
+        ((obsolete focus-out-hook))
+      (use-package! server
+        :no-require t
+        :after-call
+        pre-command-hook
+        after-find-file
+        focus-out-hook))))
 
 
 ;;
 ;;; Packages
 
+;;;###autoload
+(defun doom-set-jump-a (orig-fn &rest args)
+  "Set a jump point and ensure ORIG-FN doesn't set any new jump points."
+  (better-jumper-set-jump (if (markerp (car args)) (car args)))
+  (let ((evil--jumps-jumping t)
+        (better-jumper--jumping t))
+    (apply orig-fn args)))
+
 (use-package! better-jumper
   :hook (doom-first-input . better-jumper-mode)
-  :hook (better-jumper-post-jump . recenter)
-  :commands doom-set-jump-a doom-set-jump-maybe-a doom-set-jump-h
-  :preface
-  ;; REVIEW Suppress byte-compiler warning spawning a *Compile-Log* buffer at
-  ;; startup. This can be removed once gilbertw1/better-jumper#2 is merged.
-  (defvar better-jumper-local-mode nil)
+  :commands
+  doom-set-jump-h better-jumper-jump-forward better-jumper-jump-backward
   :init
   (global-set-key [remap evil-jump-forward]  #'better-jumper-jump-forward)
   (global-set-key [remap evil-jump-backward] #'better-jumper-jump-backward)
   (global-set-key [remap xref-pop-marker-stack] #'better-jumper-jump-backward)
   :config
-  (defun doom-set-jump-a (orig-fn &rest args)
-    "Set a jump point and ensure ORIG-FN doesn't set any new jump points."
-    (better-jumper-set-jump (if (markerp (car args)) (car args)))
-    (let ((evil--jumps-jumping t)
-          (better-jumper--jumping t))
-      (apply orig-fn args)))
-
+  (add-hook 'better-jumper-post-jump-hook #'recenter)
   (defun doom-set-jump-maybe-a (orig-fn &rest args)
     "Set a jump point if ORIG-FN returns non-nil."
-    (let ((origin (point-marker))
-          (result
-           (let* ((evil--jumps-jumping t)
-                  (better-jumper--jumping t))
-             (apply orig-fn args))))
-      (unless result
-        (with-current-buffer (marker-buffer origin)
-          (better-jumper-set-jump
-           (if (markerp (car args))
-               (car args)
-             origin))))
-      result))
+    (let ((origin (point-marker)))
+      (unwind-protect
+          (let ((result (let* ((evil--jumps-jumping t)
+                               (better-jumper--jumping t))
+                          (apply orig-fn args))))
+            (unless result
+              (with-current-buffer (marker-buffer origin)
+                (better-jumper-set-jump
+                 (if (markerp (car args))
+                     (car args)
+                   origin))))
+            result)
+        ;; delete the marker
+        (set-marker origin nil))))
 
   (defun doom-set-jump-h ()
     "Run `better-jumper-set-jump' but return nil, for short-circuiting hooks."
@@ -385,56 +457,71 @@ files, so we replace calls to `pp' with the much faster `prin1'."
   (push '(t tab-width) dtrt-indent-hook-generic-mapping-list)
 
   (defvar dtrt-indent-run-after-smie)
-  (defadvice! doom--fix-broken-smie-modes-a (orig-fn arg)
-    "Some smie modes throw errors when trying to guess their indentation, like
+  (with-suppressed-warnings ((callargs dtrt-indent-mode))
+    (defadvice! doom--fix-broken-smie-modes-a (orig-fn arg)
+      "Some smie modes throw errors when trying to guess their indentation, like
 `nim-mode'. This prevents them from leaving Emacs in a broken state."
-    :around #'dtrt-indent-mode
-    (let ((dtrt-indent-run-after-smie dtrt-indent-run-after-smie))
-      (letf! ((defun symbol-config--guess (beg end)
-                (funcall symbol-config--guess beg (min end 10000)))
-              (defun smie-config-guess ()
-                (condition-case e (funcall smie-config-guess)
-                  (error (setq dtrt-indent-run-after-smie t)
-                         (message "[WARNING] Indent detection: %s"
-                                  (error-message-string e))
-                         (message ""))))) ; warn silently
-        (funcall orig-fn arg)))))
+      :around #'dtrt-indent-mode
+      (let ((dtrt-indent-run-after-smie dtrt-indent-run-after-smie))
+        (letf! ((defun smie-config--guess (beg end)
+                  (funcall smie-config--guess beg (min end 10000)))
+                (defun smie-config-guess ()
+                  (condition-case e
+                      (funcall smie-config-guess)
+                    (error (setq dtrt-indent-run-after-smie t)
+                           (message "[WARNING] Indent detection: %s"
+                                    (error-message-string e))
+                           (message ""))))) ; warn silently
+          (funcall orig-fn arg))))))
 
+
+(eval-when-compile
+  (autoload 'helpful-function "helpful")
+  (autoload 'helpful-variable "helpful"))
 
 (use-package! helpful
   ;; a better *help* buffer
+  :commands
+  helpful-callable
+  helpful-command
+  helpful-key
+  helpful-symbol
+  helpful-variable
   :init
   (autoload 'helpful--read-symbol "helpful")
-  (global-set-key [remap describe-function] #'helpful-callable)
-  (global-set-key [remap describe-command]  #'helpful-command)
-  (global-set-key [remap describe-variable] #'helpful-variable)
-  (global-set-key [remap describe-key]      #'helpful-key)
-  (global-set-key [remap describe-symbol]   #'helpful-symbol)
+  (let ((m (current-global-map)))
+    (define-key m [remap describe-function] #'helpful-callable)
+    (define-key m [remap describe-command]  #'helpful-command)
+    (define-key m [remap describe-variable] #'helpful-variable)
+    (define-key m [remap describe-key]      #'helpful-key)
+    (define-key m [remap describe-symbol]   #'helpful-symbol))
 
   (defun doom-use-helpful-a (orig-fn &rest args)
     "Force ORIG-FN to use helpful instead of the old describe-* commands."
-    (letf! ((#'describe-function #'helpful-function)
-            (#'describe-variable #'helpful-variable))
-      (apply orig-fn args)))
+    (require 'helpful)
+    (bound! (#'helpful-function #'helpful-variable)
+      (letf! ((#'describe-function #'helpful-function)
+              (#'describe-variable #'helpful-variable))
+        (apply orig-fn args))))
 
   (after! apropos
     ;; patch apropos buttons to call helpful instead of help
-    (dolist (fun-bt '(apropos-function apropos-macro apropos-command))
-      (button-type-put
-       fun-bt 'action
-       (lambda (button)
-         (helpful-callable (button-get button 'apropos-symbol)))))
-    (dolist (var-bt '(apropos-variable apropos-user-option))
-      (button-type-put
-       var-bt 'action
-       (lambda (button)
-         (helpful-variable (button-get button 'apropos-symbol)))))))
+    (let ;; prevent unnecessary closure creation
+        ((varfn (lambda (button)
+                  (helpful-variable (button-get button 'apropos-symbol))))
+         (funfn (lambda (button)
+                  (helpful-callable (button-get button 'apropos-symbol)))))
+      (dolist (fun-bt '(apropos-function apropos-macro apropos-command))
+        (button-type-put fun-bt 'action funfn))
+      (dolist (var-bt '(apropos-variable apropos-user-option))
+        (button-type-put var-bt 'action varfn)))))
 
 
 ;;;###package imenu
 (add-hook 'imenu-after-jump-hook #'recenter)
 
 
+(defvar doom-buffer-smartparens-mode nil)
 (use-package! smartparens
   ;; Auto-close delimiters and blocks as you type. It's more powerful than that,
   ;; but that is all Doom uses it for.
@@ -488,7 +575,6 @@ files, so we replace calls to `pp' with the much faster `prin1'."
   (sp-local-pair 'minibuffer-inactive-mode "`" nil :actions nil)
 
   ;; Smartparens breaks evil-mode's replace state
-  (defvar doom-buffer-smartparens-mode nil)
   (add-hook! 'evil-replace-state-exit-hook
     (defun doom-enable-smartparens-mode-maybe-h ()
       (when doom-buffer-smartparens-mode

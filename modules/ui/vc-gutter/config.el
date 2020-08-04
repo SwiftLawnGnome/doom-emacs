@@ -62,11 +62,10 @@ is deferred until the file is saved. Respects `git-gutter:disabled-modes'."
   ;; Only enable the backends that are available, so it doesn't have to check
   ;; when opening each buffer.
   (setq git-gutter:handled-backends
-        (cons 'git (cl-remove-if-not #'executable-find (list 'hg 'svn 'bzr)
-                                     :key #'symbol-name)))
+        (cons 'git (mapcar #'intern (doom-keep #'executable-find '("hg" "svn" "bzr")))))
 
   ;; Update git-gutter on focus (in case I was using git externally)
-  (add-hook 'focus-in-hook #'git-gutter:update-all-windows)
+  (add-function :before after-focus-change-function #'git-gutter:update-all-windows)
 
   (add-hook! '(doom-escape-hook doom-switch-window-hook) :append
     (defun +vc-gutter-update-h (&rest _)

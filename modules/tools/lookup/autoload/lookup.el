@@ -1,5 +1,7 @@
 ;;; tools/lookup/autoload/lookup.el -*- lexical-binding: t; -*-
 
+(eval-when-compile (require 'core-modules))
+
 ;;;###autodef
 (defun set-lookup-handlers! (modes &rest plist)
   "Define jump handlers for major or minor MODES.
@@ -76,7 +78,10 @@ This can be passed nil as its second argument to unset handlers for MODES. e.g.
         (fset
          fn
          (lambda ()
-           (cl-destructuring-bind (&key definition implementations type-definition references documentation file xref-backend async)
+           (cl-destructuring-bind
+                 (&key definition implementations
+                       type-definition references
+                       documentation file xref-backend async)
                plist
              (cl-mapc #'+lookup--set-handler
                       (list definition
@@ -93,8 +98,8 @@ This can be passed nil as its second argument to unset handlers for MODES. e.g.
                             '+lookup-documentation-functions
                             '+lookup-file-functions
                             'xref-backend-functions)
-                      (make-list 5 async)
-                      (make-list 5 (or (eq major-mode mode)
+                      (make-list 7 async)
+                      (make-list 7 (or (eq major-mode mode)
                                        (and (boundp mode)
                                             (symbol-value mode))))))))
         (add-hook hook fn)))))
@@ -316,10 +321,11 @@ Otherwise, falls back on `find-file-at-point'."
    (progn
      (require 'ffap)
      (list
-      (or (ffap-guesser)
-          (ffap-read-file-or-url
-           (if ffap-url-regexp "Find file or URL: " "Find file: ")
-           (doom-thing-at-point-or-region))))))
+      (bound! (#'ffap-guesser #'ffap-read-file-or-url ffap-url-regexp)
+        (or (ffap-guesser)
+            (ffap-read-file-or-url
+             (if ffap-url-regexp "Find file or URL: " "Find file: ")
+             (doom-thing-at-point-or-region)))))))
   (require 'ffap)
   (cond ((and path
               buffer-file-name
@@ -346,12 +352,13 @@ Otherwise, falls back on `find-file-at-point'."
   (message "Looking up definition for %S" identifier)
   (cond ((and IS-MAC (require 'osx-dictionary nil t))
          (osx-dictionary--view-result identifier))
-        ((and +lookup-dictionary-prefer-offline
+        ((and (bound-and-true-p +lookup-dictionary-prefer-offline)
               (require 'wordnut nil t))
-         (unless (executable-find wordnut-cmd)
-           (user-error "Couldn't find %S installed on your system"
-                       wordnut-cmd))
-         (wordnut-search identifier))
+         (bound! (wordnut-cmd #'wordnut-search)
+           (unless (executable-find wordnut-cmd)
+             (user-error "Couldn't find %S installed on your system"
+                         wordnut-cmd))
+           (wordnut-search identifier)))
         ((require 'define-word nil t)
          (define-word identifier nil arg))
         ((user-error "No dictionary backend is available"))))
@@ -363,12 +370,14 @@ Otherwise, falls back on `find-file-at-point'."
    (list (doom-thing-at-point-or-region 'word) ; TODO actually use this
          current-prefix-arg))
   (message "Looking up synonyms for %S" identifier)
-  (cond ((and +lookup-dictionary-prefer-offline
+  (cond ((and (bound-and-true-p +lookup-dictionary-prefer-offline)
               (require 'synosaurus-wordnet nil t))
-         (unless (executable-find synosaurus-wordnet--command)
-           (user-error "Couldn't find %S installed on your system"
-                       synosaurus-wordnet--command))
+         (bound! (synosaurus-wordnet--command)
+           (unless (executable-find synosaurus-wordnet--command)
+             (user-error "Couldn't find %S installed on your system"
+                         synosaurus-wordnet--command)))
          (synosaurus-choose-and-replace))
-        ((require 'powerthesaurus nil t)
+        ((and (require 'powerthesaurus nil t)
+              (fboundp 'powerthesaurus-lookup-word-dwim))
          (powerthesaurus-lookup-word-dwim))
         ((user-error "No thesaurus backend is available"))))

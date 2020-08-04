@@ -1,5 +1,28 @@
 ;;; core-projects.el -*- lexical-binding: t; -*-
 
+(eval-and-compile
+  (require 'core-modules)
+  (require 'core-lib)
+  (autoload 'projectile-project-root "projectile")
+  (autoload 'projectile-project-name "projectile")
+  (autoload 'projectile-project-p "projectile")
+  (autoload 'projectile-locate-dominating-file "projectile"))
+
+(eval-when-compile
+  (require 'use-package)
+  (autoload 'projectile-find-tag "projectile")
+  (autoload 'projectile-track-known-projects-find-file-hook "projectile")
+  (autoload 'projectile-serialize-cache "projectile")
+  (autoload 'projectile-mode "projectile")
+  (autoload 'projectile-file-exists-p "projectile"))
+
+(declare-function file-exists-p! "files")
+(declare-function doom-project-p "projects")
+(declare-function doom--projectile-dirconfig-file-a "core-projects")
+(declare-function doom--only-use-generic-command-a "core-projects")
+(declare-function doom--projectile-default-generic-command-a "core-projects")
+(declare-function doom-cleanup-project-cache-h "core-projects")
+
 (defvar doom-projectile-cache-limit 25000
   "If any project cache surpasses this many files it is purged when quitting
 Emacs.")
@@ -11,7 +34,9 @@ Emacs.")
   "If non-nil, non-projects are purged from the cache on `kill-emacs-hook'.")
 
 (defvar doom-projectile-fd-binary
-  (cl-find-if #'executable-find (list "fdfind" "fd"))
+  (cond
+    ((executable-find "fd") "fd")
+    ((executable-find "fdfind") "fdfind"))
   "The filename of the `fd' executable. On some distros it's 'fdfind' (ubuntu,
 debian, and derivatives). On most it's 'fd'.")
 
@@ -20,10 +45,6 @@ debian, and derivatives). On most it's 'fd'.")
 ;;; Packages
 
 (use-package! projectile
-  :commands (projectile-project-root
-             projectile-project-name
-             projectile-project-p
-             projectile-locate-dominating-file)
   :init
   (setq projectile-cache-file (concat doom-cache-dir "projectile.cache")
         ;; Auto-discovery is slow to do by default. Better to update the list
@@ -36,8 +57,8 @@ debian, and derivatives). On most it's 'fd'.")
         projectile-known-projects-file (concat doom-cache-dir "projectile.projects")
         projectile-ignored-projects '("~/" "/tmp"))
 
-  (global-set-key [remap evil-jump-to-tag] #'projectile-find-tag)
-  (global-set-key [remap find-tag]         #'projectile-find-tag)
+  (define-key (current-global-map) [remap evil-jump-to-tag] #'projectile-find-tag)
+  (define-key (current-global-map) [remap find-tag] #'projectile-find-tag)
 
   :config
   (projectile-mode +1)
@@ -106,18 +127,20 @@ b) represent blacklisted directories that are too big, change too often or are
 c) are not valid projectile projects."
       (when (and (bound-and-true-p projectile-projects-cache)
                  doom-interactive-p)
-        (cl-loop with blacklist = (mapcar #'file-truename doom-projectile-cache-blacklist)
-                 for proot in (hash-table-keys projectile-projects-cache)
-                 if (or (not (stringp proot))
-                        (>= (length (gethash proot projectile-projects-cache))
-                            doom-projectile-cache-limit)
-                        (member (substring proot 0 -1) blacklist)
-                        (and doom-projectile-cache-purge-non-projects
-                             (not (doom-project-p proot))))
-                 do (doom-log "Removed %S from projectile cache" proot)
-                 and do (remhash proot projectile-projects-cache)
-                 and do (remhash proot projectile-projects-cache-time)
-                 and do (remhash proot projectile-project-type-cache))
+        (cl-loop
+           with blacklist = (mapcar #'file-truename doom-projectile-cache-blacklist)
+           for proot being the hash-keys of projectile-projects-cache
+           ;; for proot in (hash-table-keys projectile-projects-cache)
+           if (or (not (stringp proot))
+                  (>= (length (gethash proot projectile-projects-cache))
+                      doom-projectile-cache-limit)
+                  (member (substring proot 0 -1) blacklist)
+                  (and doom-projectile-cache-purge-non-projects
+                       (not (doom-project-p proot))))
+           do (doom-log "Removed %S from projectile cache" proot)
+           and do (remhash proot projectile-projects-cache)
+           and do (remhash proot projectile-projects-cache-time)
+           and do (remhash proot projectile-project-type-cache))
         (projectile-serialize-cache))))
 
   ;; It breaks projectile's project root resolution if HOME is a project (e.g.

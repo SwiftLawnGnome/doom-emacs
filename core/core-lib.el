@@ -3,23 +3,28 @@
 ;;
 ;;; Helpers
 
+(require 'macroexp)
+(eval-when-compile (require 'pcase)
+                   (require 'inline))
+
 (defun doom--resolve-hook-forms (hooks)
   "Converts a list of modes into a list of hook symbols.
 
 If a mode is quoted, it is left as is. If the entire HOOKS list is quoted, the
 list is returned as-is."
   (declare (pure t) (side-effect-free t))
-  (let ((hook-list (doom-enlist (doom-unquote hooks))))
+  (let ((hook-list (doom-unquote hooks)))
+    (unless (listp hook-list) (setq hook-list (list hook-list)))
     (if (eq (car-safe hooks) 'quote)
         hook-list
       (cl-loop for hook in hook-list
-               if (eq (car-safe hook) 'quote)
-               collect (cadr hook)
-               else collect (intern (format "%s-hook" (symbol-name hook)))))))
+         if (eq (car-safe hook) 'quote)
+         collect (cadr hook)
+         else collect (intern (format "%s-hook" (symbol-name hook)))))))
 
 (defun doom--setq-hook-fns (hooks rest &optional singles)
   (unless (or singles (= 0 (% (length rest) 2)))
-    (signal 'wrong-number-of-arguments (list #'evenp (length rest))))
+    (signal 'wrong-number-of-arguments (list 'even (length rest))))
   (cl-loop with vars = (let ((args rest)
                              vars)
                          (while args
@@ -48,7 +53,7 @@ list is returned as-is."
     (setq exp (cadr exp)))
   exp)
 
-(defun doom-enlist (exp)
+(defsubst doom-enlist (exp)
   "Return EXP wrapped in a list, or as-is if already a list."
   (declare (pure t) (side-effect-free error-free))
   (if (listp exp) exp (list exp)))
@@ -69,7 +74,7 @@ list is returned as-is."
   "Log to *Messages* if `doom-debug-p' is on.
 Does not interrupt the minibuffer if it is in use, but still logs to *Messages*.
 Accepts the same arguments as `message'."
-  `(when doom-debug-p
+  `(when (bound-and-true-p doom-debug-p)
      (let ((inhibit-message (active-minibuffer-window)))
        (message
         ,(concat (propertize "DOOM " 'face 'font-lock-comment-face)
@@ -109,10 +114,9 @@ unreadable. Returns the names of envvars that were changed."
              (insert-file-contents file))
            (save-match-data
              (when (re-search-forward "\0\n *\\([^#= \n]*\\)=" nil t)
-               (setq
-                env (split-string (buffer-substring (match-beginning 1) (point-max))
-                                  "\0\n"
-                                  'omit-nulls))))))
+               (split-string (buffer-substring (match-beginning 1) (point-max))
+                             "\0\n"
+                             'omit-nulls)))))
       (setq-default
        process-environment
        (nconc (nreverse env)
@@ -124,6 +128,21 @@ unreadable. Returns the names of envvars that were changed."
        (or (getenv "SHELL")
            (default-value 'shell-file-name)))
       env)))
+
+(defun doom-list* (elem &rest elems)
+  "Return a new list with ELEM and ELEMS as elements, consed onto the last arg.
+
+(doom-list* w x y z) == (cons w (cons x (cons y z)))"
+  (declare (pure t) (side-effect-free error-free)
+           (compiler-macro (lambda (_)
+                             `(backquote-list* ,elem ,@elems))))
+  (cond
+    ((not elems) elem)
+    ((not (cdr elems)) (cons elem (car elems)))
+    (t (let* ((len (length elems))
+              (last2 (nthcdr (- len 2) elems)))
+         (setcdr last2 (cadr last2)))
+       (cons elem elems))))
 
 
 ;;
@@ -141,6 +160,23 @@ at the values with which this function was called."
   (lambda (&rest pre-args)
     (apply fn (nconc pre-args args))))
 
+(defun doom-remove (predicate list)
+  (declare (pure t) (side-effect-free t))
+  (let ((result nil))
+    (while list
+      (unless (funcall predicate (car list))
+        (push (car list) result))
+      (setq list (cdr list)))
+    (nreverse result)))
+
+(defun doom-keep (predicate list)
+  (declare (pure t) (side-effect-free t))
+  (let ((result nil))
+    (while list
+      (when (funcall predicate (car list))
+        (push (car list) result))
+      (setq list (cdr list)))
+    (nreverse result)))
 
 ;;
 ;;; Sugars
@@ -180,7 +216,7 @@ the same name, for use with `funcall' or `apply'. ARGLIST and BODY are as in
 `defun'.
 
 \(fn ((TYPE NAME ARGLIST &rest BODY) ...) BODY...)"
-  (declare (indent defun))
+  (declare (indent 1))
   (setq body (macroexp-progn body))
   (when (memq (car bindings) '(defun defmacro))
     (setq bindings (list bindings)))
@@ -205,19 +241,19 @@ the same name, for use with `funcall' or `apply'. ARGLIST and BODY are as in
 
 This silences calls to `message', `load', `write-region' and anything that
 writes to `standard-output'."
-  `(if doom-debug-p
+  `(if (bound-and-true-p doom-debug-p)
        (progn ,@forms)
-     ,(if doom-interactive-p
+     ,(if (bound-and-true-p doom-interactive-p)
           `(let ((inhibit-message t)
                  (save-silently t))
-             (prog1 ,@forms (message "")))
+             (prog1 ,(macroexp-progn forms) (message "")))
         `(letf! ((standard-output (lambda (&rest _)))
                  (defun message (&rest _))
                  (defun load (file &optional noerror nomessage nosuffix must-suffix)
                    (funcall load file noerror t nosuffix must-suffix))
                  (defun write-region (start end filename &optional append visit lockname mustbenew)
-                   (unless visit (setq visit 'no-message))
-                   (funcall write-region start end filename append visit lockname mustbenew)))
+                   (funcall write-region start end filename append
+                            (or visit 'no-message) lockname mustbenew)))
            ,@forms))))
 
 (defmacro if! (cond then &rest body)
@@ -241,14 +277,14 @@ See `if!' for details on this macro's purpose."
 ;;; Closure factories
 (defmacro fn! (arglist &rest body)
   "Expands to (cl-function (lambda ARGLIST BODY...))"
-  (declare (indent defun) (doc-string 1) (pure t) (side-effect-free t))
+  (declare (indent 1) (doc-string 1))
   `(cl-function (lambda ,arglist ,@body)))
 
 (defmacro cmd! (&rest body)
   "Expands to (lambda () (interactive) ,@body).
 A factory for quickly producing interaction commands, particularly for keybinds
 or aliases."
-  (declare (doc-string 1) (pure t) (side-effect-free t))
+  (declare (doc-string 1))
   `(lambda (&rest _) (interactive) ,@body))
 
 (defmacro cmd!! (command &optional cmd-prefix-arg &rest args)
@@ -365,8 +401,8 @@ This is a wrapper around `eval-after-load' that:
       (unless (memq package (bound-and-true-p doom-disabled-packages))
         (list (if (or (not (bound-and-true-p byte-compile-current-file))
                       (require package nil 'noerror))
-                  #'progn
-                #'with-no-warnings)
+                  'progn
+                'with-no-warnings)
               (let ((body (macroexp-progn body)))
                 `(if (featurep ',package)
                      ,body
@@ -390,11 +426,11 @@ This is a wrapper around `eval-after-load' that:
   (let* ((source (file-name-sans-extension target))
          (err (cond ((not (featurep 'core))
                      (cons 'error (file-name-directory path)))
-                    ((file-in-directory-p source doom-core-dir)
-                     (cons 'doom-error doom-core-dir))
-                    ((file-in-directory-p source doom-private-dir)
-                     (cons 'doom-private-error doom-private-dir))
-                    ((cons 'doom-module-error doom-emacs-dir)))))
+                    ((file-in-directory-p source (bound-and-true-p doom-core-dir))
+                     (cons 'doom-error (bound-and-true-p doom-core-dir)))
+                    ((file-in-directory-p source (bound-and-true-p doom-private-dir))
+                     (cons 'doom-private-error (bound-and-true-p doom-private-dir)))
+                    ((cons 'doom-module-error (bound-and-true-p doom-emacs-dir))))))
     (signal (car err)
             (list (file-relative-name
                     (concat source ".el")
@@ -440,6 +476,28 @@ serve as a predicated alternative to `after!'."
            (put ',fn 'permanent-local-hook t)
            (add-hook 'after-load-functions #',fn)))))
 
+(defmacro bound! (things &rest body)
+  "Evaluates body after checking that each of FNS is `fboundp'.
+If any are not, a `void-function' error is signalled. This is to
+avoid \"not known to be defined\" and \"may not be defined at
+runtime\" compiler warnings."
+  (declare (indent 1))
+  (setq body (macroexp-progn body))
+  ;; no point if not compiling
+  (when (bound-and-true-p byte-compile-current-file)
+    (let (bound-check error-cond)
+      (dolist (thing (reverse things))
+        (if (eq (car-safe thing) 'function)
+            (setq bound-check 'fboundp
+                  error-cond 'void-function
+                  thing (cadr thing))
+          (setq bound-check 'boundp
+                error-cond 'void-variable))
+        (setq body `(if (,bound-check ',thing)
+                        ,body
+                      (signal ',error-cond '(,thing)))))))
+  body)
+
 (defmacro defer-feature! (feature &rest fns)
   "Pretend FEATURE hasn't been loaded yet, until FEATURE-hook or FN runs.
 
@@ -479,19 +537,34 @@ advised)."
         ;; Avoid `make-symbol' and `gensym' here because an interned symbol is
         ;; easier to debug in backtraces (and is visible to `describe-function')
         (fn (intern (format "doom--transient-%d-h" (cl-incf doom--transient-counter)))))
-    `(let ((sym ,hook-or-function))
-       (defun ,fn (&rest _)
-         ,(format "Transient hook for %S" (doom-unquote hook-or-function))
-         ,@forms
-         (let ((sym ,hook-or-function))
-           (cond ((functionp sym) (advice-remove sym #',fn))
-                 ((symbolp sym)   (remove-hook sym #',fn))))
-         (unintern ',fn nil))
-       (cond ((functionp sym)
-              (advice-add ,hook-or-function ,(if append :after :before) #',fn))
-             ((symbolp sym)
-              (put ',fn 'permanent-local-hook t)
-              (add-hook sym #',fn ,append))))))
+    ;; `(let ((sym ,hook-or-function))
+    ;;    (defun ,fn (&rest _)
+    ;;      ,(format "Transient hook for %S" (doom-unquote hook-or-function))
+    ;;      ,@forms
+    ;;      (let ((sym ,hook-or-function))
+    ;;        (cond ((functionp sym) (advice-remove sym #',fn))
+    ;;              ((symbolp sym)   (remove-hook sym #',fn))))
+    ;;      (unintern ',fn nil))
+    ;;    (cond ((functionp sym)
+    ;;           (advice-add ,hook-or-function ,(if append :after :before) #',fn))
+    ;;          ((symbolp sym)
+    ;;           (put ',fn 'permanent-local-hook t)
+    ;;           (add-hook sym #',fn ,append))))
+    ;; NOTE in the 99% case where HOOK-OR-FUNCTION is a constant, let this be a toplevel form
+    (macroexp-let2 nil sym hook-or-function
+      `(progn
+         (defun ,fn (&rest _)
+           ,(format "Transient hook for %S" (doom-unquote hook-or-function))
+           ,@forms
+           (cond ((functionp ,sym) (advice-remove ,sym #',fn))
+                 ((symbolp ,sym)   (remove-hook ,sym #',fn)))
+           (unintern ',fn nil))
+         (when (fboundp ',fn)
+           (cond ((functionp ,sym)
+                  (advice-add ,hook-or-function ,(if append :after :before) #',fn))
+                 ((symbolp ,sym)
+                  (put ',fn 'permanent-local-hook t)
+                  (add-hook ,sym #',fn ,append))))))))
 
 (defmacro add-hook-trigger! (hook-var &rest targets)
   "TODO"
@@ -580,11 +653,12 @@ If N and M = 1, there's no benefit to using this macro over `remove-hook'.
   (declare (indent 1))
   (macroexp-progn
    (cl-loop for (var val hook fn) in (doom--setq-hook-fns hooks var-vals)
-            collect `(defun ,fn (&rest _)
-                       ,(format "%s = %s" var (pp-to-string val))
-                       (setq-local ,var ,val))
-            collect `(remove-hook ',hook #',fn) ; ensure set order
-            collect `(add-hook ',hook #',fn))))
+      collect `(defun ,fn (&rest _)
+                 ,(format "%s = %s" var (pp-to-string val))
+                 (setq-local ,var ,val))
+      collect `(when (fboundp ',fn)         ;; satisfy compiler
+                 (remove-hook ',hook #',fn) ; ensure set order
+                 (add-hook ',hook #',fn)))))
 
 (defmacro unsetq-hook! (hooks &rest vars)
   "Unbind setq hooks on HOOKS for VARS.
@@ -594,7 +668,7 @@ If N and M = 1, there's no benefit to using this macro over `remove-hook'.
   (macroexp-progn
    (cl-loop for (_var _val hook fn)
             in (doom--setq-hook-fns hooks vars 'singles)
-            collect `(remove-hook ',hook #',fn))))
+            collect `(remove-hook ',hook ',fn))))
 
 
 ;;; Definers
@@ -616,9 +690,10 @@ DOCSTRING and BODY are as in `defun'.
             where-alist))
     `(progn
        (defun ,symbol ,arglist ,docstring ,@body)
-       (dolist (targets (list ,@(nreverse where-alist)))
-         (dolist (target (cdr targets))
-           (advice-add target (car targets) #',symbol))))))
+       (when (fboundp ',symbol)         ;compiler
+         (dolist (targets (list ,@(nreverse where-alist)))
+           (dolist (target (cdr targets))
+             (advice-add target (car targets) #',symbol)))))))
 
 (defmacro undefadvice! (symbol _arglist &optional docstring &rest body)
   "Undefine an advice called SYMBOL.
@@ -634,9 +709,10 @@ testing advice (when combined with `rotate-text').
     (while (keywordp (car body))
       (push `(cons ,(pop body) (doom-enlist ,(pop body)))
             where-alist))
-    `(dolist (targets (list ,@(nreverse where-alist)))
-       (dolist (target (cdr targets))
-         (advice-remove target #',symbol)))))
+    `(when (fboundp ',symbol)
+       (dolist (targets (list ,@(nreverse where-alist)))
+         (dolist (target (cdr targets))
+           (advice-remove target #',symbol))))))
 
 
 ;;

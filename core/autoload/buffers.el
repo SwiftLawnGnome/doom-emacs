@@ -1,5 +1,11 @@
 ;;; core/autoload/buffers.el -*- lexical-binding: t; -*-
 
+(require 'core-lib)
+(eval-when-compile (require 'inline))
+
+(declare-function doom-project-root "projects")
+(declare-function projectile-project-buffer-p "projectile")
+
 ;;;###autoload
 (defvar doom-real-buffer-functions
   '(doom-dired-buffer-p)
@@ -67,8 +73,8 @@ If no project is active, return all buffers."
                (if project (expand-file-name project)
                  (doom-project-root))))
         (cl-loop for buf in buffers
-                 if (projectile-project-buffer-p buf project-root)
-                 collect buf)
+           if (projectile-project-buffer-p buf project-root)
+           collect buf)
       buffers)))
 
 ;;;###autoload
@@ -85,40 +91,42 @@ If no project is active, return all buffers."
 ;;;###autoload
 (defun doom-dired-buffer-p (buf)
   "Returns non-nil if BUF is a dired buffer."
-  (with-current-buffer buf (derived-mode-p 'dired-mode)))
+  (provided-mode-derived-p (buffer-local-value 'major-mode buf) 'dired-mode))
 
 ;;;###autoload
 (defun doom-special-buffer-p (buf)
   "Returns non-nil if BUF's name starts and ends with an *."
-  (equal (substring (buffer-name buf) 0 1) "*"))
+  (let ((name (buffer-name buf)))
+    (and (eq (aref name 0) ?*)
+         (eq (aref name (1- (length name))) ?*))))
 
 ;;;###autoload
-(defun doom-temp-buffer-p (buf)
+(define-inline doom-temp-buffer-p (buf)
   "Returns non-nil if BUF is temporary."
-  (equal (substring (buffer-name buf) 0 1) " "))
+  (inline-quote (eq (aref (buffer-name ,buf) 0) ?\s)))
 
 ;;;###autoload
-(defun doom-visible-buffer-p (buf)
+(define-inline doom-visible-buffer-p (buf)
   "Return non-nil if BUF is visible."
-  (get-buffer-window buf))
+  (inline-quote (get-buffer-window ,buf)))
 
 ;;;###autoload
-(defun doom-buried-buffer-p (buf)
+(define-inline doom-buried-buffer-p (buf)
   "Return non-nil if BUF is not visible."
-  (not (doom-visible-buffer-p buf)))
+  (inline-quote (not (doom-visible-buffer-p ,buf))))
 
 ;;;###autoload
-(defun doom-non-file-visiting-buffer-p (buf)
+(define-inline doom-non-file-visiting-buffer-p (buf)
   "Returns non-nil if BUF does not have a value for `buffer-file-name'."
-  (not (buffer-file-name buf)))
+  (inline-quote (not (buffer-file-name ,buf))))
 
 ;;;###autoload
 (defun doom-real-buffer-list (&optional buffer-list)
   "Return a list of buffers that satify `doom-real-buffer-p'."
-  (cl-remove-if-not #'doom-real-buffer-p (or buffer-list (doom-buffer-list))))
+  (doom-keep #'doom-real-buffer-p (or buffer-list (doom-buffer-list))))
 
 ;;;###autoload
-(defun doom-real-buffer-p (buffer-or-name)
+(defun doom-real-buffer-p (&optional buffer-or-name)
   "Returns t if BUFFER-OR-NAME is a 'real' buffer.
 
 A real buffer is a useful buffer; a first class citizen in Doom. Real ones
@@ -135,10 +143,9 @@ The exact criteria for a real buffer is:
      non-nil.
 
 If BUFFER-OR-NAME is omitted or nil, the current buffer is tested."
-  (or (bufferp buffer-or-name)
-      (stringp buffer-or-name)
-      (signal 'wrong-type-argument (list '(bufferp stringp) buffer-or-name)))
-  (when-let (buf (get-buffer buffer-or-name))
+  (when-let (buf (if buffer-or-name
+                     (get-buffer buffer-or-name)
+                   (current-buffer)))
     (when-let (basebuf (buffer-base-buffer buf))
       (setq buf basebuf))
     (and (buffer-live-p buf)
@@ -148,7 +155,7 @@ If BUFFER-OR-NAME is omitted or nil, the current buffer is tested."
              (not (run-hook-with-args-until-success 'doom-unreal-buffer-functions buf))))))
 
 ;;;###autoload
-(defun doom-unreal-buffer-p (buffer-or-name)
+(defsubst doom-unreal-buffer-p (buffer-or-name)
   "Return t if BUFFER-OR-NAME is an 'unreal' buffer.
 
 See `doom-real-buffer-p' for details on what that means."
@@ -160,13 +167,14 @@ See `doom-real-buffer-p' for details on what that means."
 
 If DERIVED-P, test with `derived-mode-p', otherwise use `eq'."
   (let ((modes (doom-enlist modes)))
-    (cl-remove-if-not (if derived-p
-                          (lambda (buf)
-                            (with-current-buffer buf
-                              (apply #'derived-mode-p modes)))
-                        (lambda (buf)
-                          (memq (buffer-local-value 'major-mode buf) modes)))
-                      (or buffer-list (doom-buffer-list)))))
+    (doom-keep (if derived-p
+                   (lambda (buf)
+                     (apply #'provided-mode-derived-p
+                            (buffer-local-value 'major-mode buf)
+                            modes))
+                 (lambda (buf)
+                   (memq (buffer-local-value 'major-mode buf) modes)))
+               (or buffer-list (doom-buffer-list)))))
 
 ;;;###autoload
 (defun doom-visible-windows (&optional window-list)
@@ -180,13 +188,13 @@ If DERIVED-P, test with `derived-mode-p', otherwise use `eq'."
 (defun doom-visible-buffers (&optional buffer-list)
   "Return a list of visible buffers (i.e. not buried)."
   (if buffer-list
-      (cl-remove-if-not #'get-buffer-window buffer-list)
+      (doom-keep #'get-buffer-window buffer-list)
     (delete-dups (mapcar #'window-buffer (window-list)))))
 
 ;;;###autoload
 (defun doom-buried-buffers (&optional buffer-list)
   "Get a list of buffers that are buried."
-  (cl-remove-if #'get-buffer-window (or buffer-list (doom-buffer-list))))
+  (doom-remove #'get-buffer-window (or buffer-list (doom-buffer-list))))
 
 ;;;###autoload
 (defun doom-matching-buffers (pattern &optional buffer-list)
@@ -207,8 +215,9 @@ See `doom-real-buffer-p' for an explanation for real buffers."
 (defun doom-kill-buffer-and-windows (buffer)
   "Kill the buffer and delete all the windows it's displayed in."
   (dolist (window (get-buffer-window-list buffer))
-    (unless (one-window-p t)
-      (delete-window window)))
+    (with-selected-window window
+      (unless (one-window-p t)
+        (delete-window window))))
   (kill-buffer buffer))
 
 ;;;###autoload
@@ -227,27 +236,29 @@ See `doom-real-buffer-p' for an explanation for real buffers."
 to a real buffer or the fallback buffer."
   (let ((windows (get-buffer-window-list buffer)))
     (kill-buffer buffer)
-    (doom-fixup-windows (cl-remove-if-not #'window-live-p windows))))
+    (doom-fixup-windows (doom-keep #'window-live-p windows))))
 
 ;;;###autoload
 (defun doom-kill-buffers-fixup-windows (buffers)
   "Kill the BUFFERS and ensure all the windows they were displayed in have
 switched to a real buffer or the fallback buffer."
-  (let ((seen-windows (make-hash-table :test 'eq :size 8)))
+  (let ((seen-windows ()))
     (dolist (buffer buffers)
       (let ((windows (get-buffer-window-list buffer)))
         (kill-buffer buffer)
-        (dolist (window (cl-remove-if-not #'window-live-p windows))
-          (puthash window t seen-windows))))
-    (doom-fixup-windows (hash-table-keys seen-windows))))
+        (dolist (window windows)
+          (and (window-live-p window)
+               (not (memq window seen-windows))
+               (push window seen-windows)))))
+    (doom-fixup-windows seen-windows)))
 
 ;;;###autoload
 (defun doom-kill-matching-buffers (pattern &optional buffer-list)
   "Kill all buffers (in current workspace OR in BUFFER-LIST) that match the
 regex PATTERN. Returns the number of killed buffers."
   (let ((buffers (doom-matching-buffers pattern buffer-list)))
-    (dolist (buf buffers (length buffers))
-      (kill-buffer buf))))
+    (mapc #'kill-buffer buffers)
+    (length buffers)))
 
 
 ;;
@@ -272,14 +283,14 @@ have switched to a real buffer or the fallback buffer.
 If DONT-SAVE, don't prompt to save modified buffers (discarding their changes)."
   (interactive
    (list (current-buffer) current-prefix-arg))
-  (cl-assert (bufferp buffer) t)
+  (cl-check-type buffer buffer)
   (when (and (buffer-modified-p buffer) dont-save)
     (with-current-buffer buffer
       (set-buffer-modified-p nil)))
   (doom-kill-buffer-fixup-windows buffer))
 
 
-(defun doom--message-or-count (interactive message count)
+(defsubst doom--message-or-count (interactive message count)
   (if interactive
       (message message count)
     count))
@@ -305,7 +316,7 @@ belong to the current project."
     (doom--message-or-count
      interactive "Killed %d buffers"
      (- (length buffer-list)
-        (length (cl-remove-if-not #'buffer-live-p buffer-list))))))
+        (length (doom-keep #'buffer-live-p buffer-list))))))
 
 ;;;###autoload
 (defun doom/kill-other-buffers (&optional buffer-list interactive)
@@ -323,7 +334,7 @@ project."
   (doom--message-or-count
    interactive "Killed %d other buffers"
    (- (length buffer-list)
-      (length (cl-remove-if-not #'buffer-live-p buffer-list)))))
+      (length (doom-keep #'buffer-live-p buffer-list)))))
 
 ;;;###autoload
 (defun doom/kill-matching-buffers (pattern &optional buffer-list interactive)
@@ -340,7 +351,7 @@ If the prefix arg is passed, only kill matching buffers in the current project."
   (when interactive
     (message "Killed %d buffer(s)"
              (- (length buffer-list)
-                (length (cl-remove-if-not #'buffer-live-p buffer-list))))))
+                (length (doom-keep #'buffer-live-p buffer-list))))))
 
 ;;;###autoload
 (defun doom/kill-buried-buffers (&optional buffer-list interactive)
@@ -352,11 +363,13 @@ current project."
    (list (doom-buried-buffers
           (if current-prefix-arg (doom-project-buffer-list)))
          t))
-  (mapc #'kill-buffer buffer-list)
-  (doom--message-or-count
-   interactive "Killed %d buried buffers"
-   (- (length buffer-list)
-      (length (cl-remove-if-not #'buffer-live-p buffer-list)))))
+  (let ((count 0))
+    (dolist (buf buffer-list)
+      (when (buffer-live-p buf)
+        (kill-buffer buf)
+        (cl-incf count)))
+    (mapc #'kill-buffer buffer-list)
+    (doom--message-or-count interactive "Killed %d buried buffers" count)))
 
 ;;;###autoload
 (defun doom/kill-project-buffers (project &optional interactive)
@@ -366,10 +379,11 @@ current project."
              (completing-read
               "Kill buffers for project: " open-projects
               nil t nil nil
-              (if-let* ((project-root (doom-project-root))
-                        (project-root (abbreviate-file-name project-root))
-                        ((member project-root open-projects)))
-                  project-root))
+              (when-let*
+                  ((project-root (doom-project-root))
+                   (project-root (abbreviate-file-name project-root))
+                   ((member project-root open-projects)))
+                project-root))
            (message "No projects are open!")
            nil)
          t))
@@ -379,4 +393,4 @@ current project."
       (doom--message-or-count
        interactive "Killed %d project buffers"
        (- (length buffer-list)
-          (length (cl-remove-if-not #'buffer-live-p buffer-list)))))))
+          (length (doom-keep #'buffer-live-p buffer-list)))))))

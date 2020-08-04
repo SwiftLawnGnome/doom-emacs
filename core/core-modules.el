@@ -1,6 +1,27 @@
 ;;; core-modules.el --- module & package management system -*- lexical-binding: t; -*-
 
 (require 'core)
+(require 'core-packages)
+
+;; feed the compiler
+(defvar use-package-compute-statistics)
+(defvar use-package-verbose)
+(defvar use-package-minimum-reported-time)
+(defvar use-package-expand-minimally)
+(defvar use-package-ensure-function)
+(defvar use-package-font-lock-keywords)
+(defvar use-package-keywords)
+(defvar use-package-deferring-keywords)
+(declare-function doom-debug-mode "debug")
+(declare-function doom-files-in "files")
+(declare-function use-package-ensure-elpa "use-package-ensure")
+(declare-function use-package-process-keywords "use-package-core")
+(declare-function use-package-list-insert "use-package-core")
+(declare-function use-package-normalize-mode "use-package-core")
+(declare-function use-package-handle-mode "use-package-core")
+(declare-function use-package-concat "use-package-core")
+(declare-function use-package-normalize-symlist "use-package-core")
+(declare-function doom--resolve-load-path-from-containg-file-a "core-modules")
 
 (defvar doom-init-modules-p nil
   "Non-nil if `doom-initialize-modules' has run.")
@@ -122,7 +143,7 @@ non-nil."
         (maphash (doom-module-loader doom-module-config-file) doom-modules)
         (run-hook-wrapped 'doom-init-modules-hook #'doom-try-run-hook)
         (load! "config" doom-private-dir t)
-        (load custom-file 'noerror (not doom-debug-mode))))))
+        (load custom-file 'noerror (not (bound-and-true-p doom-debug-mode)))))))
 
 
 ;;
@@ -238,20 +259,19 @@ The list is in no particular order and its file paths are absolute. If
 MODULE-DIRS is non-nil, include all modules (even disabled ones) available in
 those directories. The first returned path is always `doom-private-dir'."
   (declare (pure t) (side-effect-free t))
-  (append (list doom-private-dir)
-          (if module-dirs
-              (mapcar (lambda (m) (doom-module-locate-path (car m) (cdr m)))
-                      (delete-dups
-                       (doom-files-in (if (listp module-dirs)
-                                          module-dirs
-                                        doom-modules-dirs)
-                                      :map #'doom-module-from-path
-                                      :type 'dirs
-                                      :mindepth 1
-                                      :depth 1)))
-            (cl-loop for plist being the hash-values of doom-modules
-                     collect (plist-get plist :path)))
-          nil))
+  (cons doom-private-dir
+        (if module-dirs
+            (mapcar (lambda (m) (doom-module-locate-path (car m) (cdr m)))
+                    (delete-dups
+                     (doom-files-in (if (listp module-dirs)
+                                        module-dirs
+                                      doom-modules-dirs)
+                                    :map #'doom-module-from-path
+                                    :type 'dirs
+                                    :mindepth 1
+                                    :depth 1)))
+          (cl-loop for plist being the hash-values of doom-modules
+             collect (plist-get plist :path)))))
 
 (defun doom-module-mplist-map (fn mplist)
   "Apply FN to each module in MPLIST."
@@ -285,7 +305,7 @@ those directories. The first returned path is always `doom-private-dir'."
                  (when-let (new (assq module obsolete))
                    (let ((newkeys (cdr new)))
                      (if (null newkeys)
-                         (message "WARNING %s module was removed" key)
+                         (message "WARNING %s module was removed" (list category module))
                        (if (cdr newkeys)
                            (message "WARNING %s module was removed and split into the %s modules"
                                     (list category module) (mapconcat #'prin1-to-string newkeys ", "))
@@ -300,7 +320,7 @@ those directories. The first returned path is always `doom-private-dir'."
                          (push (car key) mplist))
                        (throw 'doom-modules t))))
                  (push (funcall fn category module
-                                :flags (if (listp m) (cdr m))
+                                :flags (cdr-safe m)
                                 :path (doom-module-locate-path category module))
                        results))))))
     (unless doom-interactive-p
@@ -311,8 +331,8 @@ those directories. The first returned path is always `doom-private-dir'."
   "Minimally initialize `doom-modules' (a hash table) and return it.
 This value is cached. If REFRESH-P, then don't use the cached value."
   (if all-p
-      (cl-loop for path in (cdr (doom-module-load-path 'all))
-               collect (doom-module-from-path path))
+      (mapcar #'doom-module-from-path
+              (cdr (doom-module-load-path 'all)))
     doom-modules))
 
 
@@ -321,7 +341,7 @@ This value is cached. If REFRESH-P, then don't use the cached value."
 
 (defvar doom--deferred-packages-alist '(t))
 
-(autoload 'use-package "use-package-core" nil nil t)
+;; (autoload 'use-package "use-package-core" nil nil t)
 
 (setq use-package-compute-statistics doom-debug-p
       use-package-verbose doom-debug-p
@@ -414,15 +434,19 @@ This value is cached. If REFRESH-P, then don't use the cached value."
                      (delq! deferral-list doom--deferred-packages-alist)
                      (unintern ',fn nil)))))
          (let (forms)
-           (dolist (hook hooks forms)
+           (dolist (hook hooks)
              (push (if (string-match-p "-\\(?:functions\\|hook\\)$" (symbol-name hook))
                        `(add-hook ',hook #',fn)
                      `(advice-add #',hook :before #',fn))
-                   forms)))
+                   forms))
+           forms)
          `((unless (assq ',name doom--deferred-packages-alist)
              (push '(,name) doom--deferred-packages-alist))
            (nconc (assq ',name doom--deferred-packages-alist)
                   '(,@hooks)))
+         (when (bound-and-true-p byte-compile-current-file)
+           `((eval-when-compile
+               (declare-function ,fn ,(if (symbolp name) (symbol-name name) name)))))
          (use-package-process-keywords name rest state))))))
 
 
@@ -474,7 +498,7 @@ to least)."
           modules))
      doom-modules))
 
-(defvar doom-disabled-packages)
+;; (defvar doom-disabled-packages)
 (defmacro use-package! (name &rest plist)
   "Declares and configures a package.
 

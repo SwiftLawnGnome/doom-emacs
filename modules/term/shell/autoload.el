@@ -1,5 +1,7 @@
 ;;; term/shell/autoload.el -*- lexical-binding: t; -*-
 
+(defvar comint-last-prompt)
+
 (defun +shell-idle-p (buf)
   "Return t if the shell in BUF is not running something.
 When available, use process hierarchy information via pstree for
@@ -17,9 +19,9 @@ prompt."
           comint-says-idle
         ;; for local shells, we can potentially do better using pgrep
         (condition-case nil
-            (case (call-process ;; look at the exit code of pgrep -P <pid>
-                   "pgrep" nil nil nil "-P"
-                   (number-to-string (process-id (get-buffer-process buf))))
+            (cl-case (call-process ;; look at the exit code of pgrep -P <pid>
+                      "pgrep" nil nil nil "-P"
+                      (number-to-string (process-id (get-buffer-process buf))))
               (0 nil) ;; child procxesses found, not idle
               (1 t)   ;; not running any child processes, it's idle
               (t comint-says-idle)) ;; anything else, fall back on comint.
@@ -32,10 +34,9 @@ prompt."
 
 (defun +shell-tramp-hosts ()
   "Ask tramp for a list of hosts that we can reach through ssh."
-  (cl-reduce #'append
-             (mapcar (lambda (x)
-                       (delq nil (mapcar #'cadr (apply (car x) (cdr x)))))
-                     (tramp-get-completion-function "scp"))))
+  (mapcan (lambda (x)
+            (delq nil (mapcar #'cadr (apply (car x) (cdr x)))))
+          (tramp-get-completion-function "scp")))
 
 (defun +shell--sentinel (process _event)
   (when (memq (process-status process) '(exit stop))

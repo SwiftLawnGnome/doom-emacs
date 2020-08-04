@@ -2,6 +2,10 @@
 
 ;;
 ;;; Library
+(declare-function buttercup-run "buttercup")
+(defvar calculate-lisp-indent-last-sexp)
+(require 'core-vars)
+(require 'core-lib)
 
 ;;;###autoload
 (defun +emacs-lisp-eval (beg end)
@@ -142,19 +146,19 @@ https://emacs.stackexchange.com/questions/10230/how-to-indent-keywords-aligned"
   (interactive)
   (pop-to-buffer
    (or (get-buffer "*ielm*")
-       (progn (ielm)
-              (let ((buf (get-buffer "*ielm*")))
-                (bury-buffer buf)
-                buf)))))
+       (progn
+         (ielm)
+         (let ((buf (get-buffer "*ielm*")))
+           (bury-buffer buf)
+           buf)))))
 
 ;;;###autoload
 (defun +emacs-lisp/buttercup-run-file ()
   "Run all buttercup tests in the focused buffer."
   (interactive)
-  (let ((load-path (append (list (doom-path (dir!) "..")
-                                 (or (doom-project-root)
-                                     default-directory))
-                           load-path)))
+  (let ((load-path `(,(doom-path (dir!) "..")
+                      ,(or (doom-project-root) default-directory)
+                      ,@load-path)))
     (save-selected-window
       (eval-buffer)
       (buttercup-run))

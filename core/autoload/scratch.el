@@ -1,5 +1,8 @@
 ;;; core/autoload/scratch.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(eval-when-compile (require 'core-lib))
+
 (defvar doom-scratch-default-file "__default"
   "The default file name for a project-less scratch buffer.
 
@@ -98,7 +101,7 @@ the first, fresh scratch buffer you create. This accepts:
 (defun doom-persist-scratch-buffers-h ()
   "Save all scratch buffers to `doom-scratch-dir'."
   (setq doom-scratch-buffers
-        (cl-delete-if-not #'buffer-live-p doom-scratch-buffers))
+        (doom-keep #'buffer-live-p doom-scratch-buffers))
   (dolist (buffer doom-scratch-buffers)
     (with-current-buffer buffer
       (doom-persist-scratch-buffer-h))))
@@ -145,7 +148,7 @@ If PROJECT-P is non-nil, open a persistent scratch buffer associated with the
              doom-scratch-initial-major-mode))
       default-directory
       (when project-p
-        (doom-project-name))))))
+        (bound! (#'doom-project-name) (doom-project-name)))))))
 
 ;;;###autoload
 (defun doom/switch-to-scratch-buffer (&optional arg project-p)

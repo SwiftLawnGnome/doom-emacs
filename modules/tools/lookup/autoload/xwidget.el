@@ -1,6 +1,7 @@
 ;;; tools/lookup/autoload/xwidget.el -*- lexical-binding: t; -*-
 
 (defvar +lookup--xwidget-webkit-last-session-buffer nil)
+(defvar xwidget-webkit-last-session-buffer)
 
 ;;;###autoload
 (defun +lookup-xwidget-webkit-open-url-fn (url &optional new-session)

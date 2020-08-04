@@ -1,5 +1,11 @@
 ;;; editor/snippets/autoload/snippets.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(defvar yas-prompt-functions)
+(defvar yas--active-field-overlay)
+(defvar yas--tables)
+(defvar yas-snippet-dirs)
+
 (defun +snippets--remove-p (x y)
   (and (equal (yas--template-key x) (yas--template-key y))
        (file-in-directory-p (yas--template-get-file x) doom-emacs-dir)))

@@ -1,5 +1,12 @@
 ;;; config/literate/autoload.el -*- lexical-binding: t; -*-
 
+(require 'core)
+
+(declare-function org-export-expand-include-keyword "ox")
+(declare-function org-babel-tangle "ob-tangle")
+(declare-function doom/reload "config")
+(defvar org-inhibit-startup)
+
 (defvar +literate-config-file
   (concat doom-private-dir "config.org")
   "The file path of your literate config file.")
@@ -23,21 +30,23 @@ byte-compiled from.")
           (unwind-protect
               (letf! ((defun message (msg &rest args)
                         (when msg
-                          (print! (info "%s") (apply #'format msg args))))
+                          (print! (info "%s") (apply #'format-message msg args))))
                       ;; Prevent infinite recursion due to recompile-on-save
                       ;; hooks later.
-                      (org-mode-hook nil))
+                      ;; (org-mode-hook nil)
+                      (org-inhibit-startup t))
                 ;; Do the ol' switcheroo because `org-babel-tangle' writes
                 ;; changes to the user's literate config, which would impose on
                 ;; the user.
-                (copy-file org backup t)
+                (copy-file org backup t t)
                 (with-current-buffer (find-file-noselect org)
                   ;; Tangling won't ordinarily expand #+INCLUDE directives, so
                   ;; we do it ourselves.
-                  (org-export-expand-include-keyword)
-                  (org-babel-tangle nil dest))
+                  (delay-mode-hooks
+                    (org-export-expand-include-keyword)
+                    (org-babel-tangle nil dest)))
                 t)
-            (ignore-errors (copy-file backup org t))
+            (ignore-errors (copy-file backup org t t))
             (ignore-errors (delete-file backup)))
           ;; Write an empty file to serve as our mtime cache
           (with-temp-file +literate-config-cache-file)))))

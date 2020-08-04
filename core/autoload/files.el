@@ -1,5 +1,22 @@
 ;;; core/autoload/files.el -*- lexical-binding: t; -*-
 
+(require 'core-lib)
+(eval-when-compile (require 'inline))
+
+(declare-function file! "core-lib")
+(declare-function doom-rpartial "core-lib")
+(declare-function doom-enlist "core-lib")
+(declare-function doom-call-process "process")
+(declare-function magit-toplevel "magit-git")
+(declare-function recentf-remove-if-non-kept "recentf")
+(declare-function doom-project-p "projects")
+(declare-function projectile-file-cached-p "projectile")
+(declare-function doom-project-root "projects")
+(declare-function projectile-purge-file-from-cache "projectile")
+(declare-function magit-refresh "magit-mode")
+(declare-function save-place-forget-unreadable-files "saveplace")
+(declare-function doom/kill-this-buffer-in-all-windows "buffers")
+
 (defun doom--resolve-path-forms (spec &optional directory)
   "Converts a simple nested series of or/and forms into a series of
 `file-exists-p' checks.

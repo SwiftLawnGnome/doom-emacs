@@ -23,6 +23,11 @@
 ;; modify, and should follow a ;;;## package-name header line (if not using
 ;; `after!' or `use-package!').
 
+(eval-when-compile
+  (require 'core-lib))
+(defvar +popup--inhibit-select)
+(defvar eshell-destroy-buffer-when-process-dies)
+
 ;;
 ;;; Core functions
 
@@ -67,7 +72,9 @@ to this commmand."
 
 ;;;###package eshell
 (progn
-  (setq eshell-destroy-buffer-when-process-dies t)
+  (with-eval-after-load 'em-term
+    (setq eshell-destroy-buffer-when-process-dies t))
+
 
   ;; When eshell runs a visual command (see `eshell-visual-commands'), it spawns
   ;; a term buffer to run it in, but where it spawns it is the problem...
@@ -107,18 +114,20 @@ to this commmand."
 the command buffer."
     :override #'evil-command-window-execute
     (interactive)
-    (let ((result (buffer-substring (line-beginning-position)
-                                    (line-end-position)))
-          (execute-fn evil-command-window-execute-fn)
-          (execute-window (get-buffer-window evil-command-window-current-buffer))
-          (popup (selected-window)))
-      (if execute-window
-          (select-window execute-window)
-        (user-error "Originating buffer is no longer active"))
-      ;; (kill-buffer "*Command Line*")
-      (delete-window popup)
-      (funcall execute-fn result)
-      (setq evil-command-window-current-buffer nil)))
+    (bound! (evil-command-window-execute-fn
+             evil-command-window-current-buffer)
+      (let ((result (buffer-substring (line-beginning-position)
+                                      (line-end-position)))
+            (execute-fn evil-command-window-execute-fn)
+            (execute-window (get-buffer-window evil-command-window-current-buffer))
+            (popup (selected-window)))
+        (if execute-window
+            (select-window execute-window)
+          (user-error "Originating buffer is no longer active"))
+        ;; (kill-buffer "*Command Line*")
+        (delete-window popup)
+        (funcall execute-fn result)
+        (setq evil-command-window-current-buffer nil))))
 
   ;; Don't mess with popups
   (advice-add #'+evil--window-swap           :around #'+popup-save-a)

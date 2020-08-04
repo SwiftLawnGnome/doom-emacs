@@ -34,23 +34,36 @@
 ;; will purge ELPA packages.
 
 (require 'macroexp)
-(eval-when-compile (require 'core-lib))
+(require 'core-vars)
+(eval-and-compile
+  (require 'core-lib))
 
-(defvar doom-packages ()
-  "A list of enabled packages. Each element is a sublist, whose CAR is the
-package's name as a symbol, and whose CDR is the plist supplied to its
-`package!' declaration. Set by `doom-initialize-packages'.")
-
-(defvar doom-disabled-packages ()
-  "A list of packages that should be ignored by `use-package!' and `after!'.")
-
-(defvar doom-packages-file "packages"
-  "The basename of packages file for modules.
-
-Package files are read whenever Doom's package manager wants a manifest of all
-desired packages. They are rarely read in interactive sessions (unless the user
-uses a straight or package.el command directly).")
-
+(defvar straight-base-dir)
+(defvar straight-repository-branch)
+(defvar straight-cache-autoloads)
+(defvar straight-check-for-modifications)
+(defvar straight-enable-package-integration)
+(defvar straight-vc-git-default-clone-depth)
+(defvar autoload-compute-prefixes)
+(defvar straight-fix-org)
+(defvar straight--recipe-cache)
+(defvar straight--build-cache)
+(declare-function doom-call-process "process")
+(declare-function doom-exec-process "process")
+(declare-function package--ensure-init-file "package")
+(declare-function straight-override-recipe "straight")
+(declare-function doom-path "files")
+(declare-function straight-use-package "straight")
+(declare-function straight-register-package "straight")
+(declare-function straight-recipes-retrieve "straight")
+(declare-function straight-vc-local-repo-name "straight")
+(declare-function straight--build-dir "straight")
+(declare-function doom-module-from-path "core-modules")
+(declare-function doom-module-list "core-modules")
+(declare-function doom-files-in "files")
+(declare-function doom-module-path "core-modules")
+(declare-function plist-put! "plist")
+(declare-function plist-delete! "plist")
 
 ;;
 ;;; package.el
@@ -63,13 +76,16 @@ uses a straight or package.el command directly).")
       ;; I omit Marmalade because its packages are manually submitted rather
       ;; than pulled, so packages are often out of date with upstream.
       package-archives
-      (let ((proto (if gnutls-verify-error "https" "http")))
+      (let ((proto (if (bound-and-true-p gnutls-verify-error) "https" "http")))
         (list (cons "gnu"   (concat proto "://elpa.gnu.org/packages/"))
               (cons "melpa" (concat proto "://melpa.org/packages/"))
               (cons "org"   (concat proto "://orgmode.org/elpa/")))))
 
 ;; package.el has no business modifying the user's init.el
-(advice-add #'package--ensure-init-file :override #'ignore)
+;; this was removed recently. it was at least 27, not sure which minor version
+;; it was
+(unless EMACS27+
+  (advice-add #'package--ensure-init-file :override #'ignore))
 
 ;; Refresh package.el the first time you call `package-install', so it can still
 ;; be used (e.g. to temporarily test packages). Remember to run 'doom sync' to
@@ -119,7 +135,7 @@ uses a straight or package.el command directly).")
 
 (defun doom--ensure-straight (recipe pin)
   (let ((repo-dir (doom-path straight-base-dir "straight/repos/straight.el"))
-        (repo-url (concat "http" (if gnutls-verify-error "s")
+        (repo-url (concat "http" (if (bound-and-true-p gnutls-verify-error) "s")
                           "://github.com/"
                           (or (plist-get recipe :repo) "raxod502/straight.el")))
         (call (if doom-debug-p #'doom-exec-process #'doom-call-process)))
@@ -251,11 +267,11 @@ processed."
 
 (defun doom-package-depending-on (package &optional noerror)
   "Return a list of packages that depend on the package named NAME."
-  (cl-check-type name symbol)
+  (cl-check-type package symbol)
   ;; can't get dependencies for built-in packages
-  (unless (or (doom-package-build-recipe name)
+  (unless (or (doom-package-build-recipe package)
               noerror)
-    (error "Couldn't find %s, is it installed?" name))
+    (error "Couldn't find %s, is it installed?" package))
   (cl-loop for pkg in (hash-table-keys straight--build-cache)
            for deps = (doom-package-dependencies pkg)
            if (memq package deps)
@@ -355,11 +371,11 @@ ones."
                    for doom--current-module = key
                    do (doom--read-packages path nil 'noerror)))
         (doom--read-packages private-packages all-p 'noerror)))
-    (cl-remove-if-not
-     (if core-only-p
-         (lambda (pkg) (eq (plist-get (cdr pkg) :type) 'core))
-       #'identity)
-     (nreverse doom-packages))))
+    (if core-only-p
+        (doom-keep (lambda (pkg)
+                     (eq (plist-get (cdr pkg) :type) 'core))
+                   (nreverse doom-packages))
+      (delq nil (nreverse doom-packages)))))
 
 (defun doom-package-pinned-list ()
   "Return an alist mapping package names (strings) to pinned commits (strings)."

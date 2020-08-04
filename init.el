@@ -43,6 +43,9 @@
   ;; Ensure Doom is running out of this file's directory
   (setq user-emacs-directory (file-name-directory load-file-name)))
 
+(load (concat user-emacs-directory "core/core-vars")
+      nil 'nomessage)
+
 ;; Load the heart of Doom Emacs
 (load (concat user-emacs-directory "core/core")
       nil 'nomessage)

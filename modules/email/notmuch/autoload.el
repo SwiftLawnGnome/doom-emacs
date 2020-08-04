@@ -1,5 +1,8 @@
 ;;; email/notmuch/autoload.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-modules))
+
 ;;;###autoload
 (defun =notmuch ()
   "Activate (or switch to) `notmuch' in its workspace."
@@ -14,7 +17,7 @@
             (select-window (get-buffer-window buf))
           (notmuch-search "tag:inbox"))
         (+workspace/display))
-    ('error
+    (error
      (+notmuch/quit)
      (signal (car e) (cdr e)))))
 
@@ -40,7 +43,7 @@
     (set-process-sentinel
      (start-process-shell-command
       "notmuch update" buf
-      (pcase +notmuch-sync-backend
+      (pcase (bound-and-true-p +notmuch-sync-backend)
         (`gmi
          (concat "cd " +notmuch-mail-folder " && gmi push && gmi pull && notmuch new && afew -a -t"))
         (`mbsync
@@ -49,7 +52,7 @@
          "mbsync -c \"$XDG_CONFIG_HOME\"/isync/mbsyncrc -a && notmuch new && afew -a -t")
         (`offlineimap
          "offlineimap && notmuch new && afew -a -t")
-        (`custom +notmuch-sync-command)))
+        (`custom (bound-and-true-p +notmuch-sync-command))))
      ;; refresh notmuch buffers if sync was successful
      (lambda (_process event)
        (if (string= event "finished\n")
@@ -207,7 +210,7 @@
 ;;                   (widget-insert (make-string column-indent ? )))
 ;;               (let* ((name (plist-get elem :name))
 ;;                      (query (plist-get elem :query))
-;;                      (oldest-first (case (plist-get elem :sort-order)
+;;                      (oldest-first (cl-case (plist-get elem :sort-order)
 ;;                                      (newest-first nil)
 ;;                                      (oldest-first t)
 ;;                                      (otherwise notmuch-search-oldest-first)))

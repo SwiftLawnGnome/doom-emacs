@@ -1,5 +1,7 @@
 ;;; core/autoload/help.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+
 (defvar doom--help-major-mode-module-alist
   '((dockerfile-mode :tools docker)
     (agda2-mode      :lang agda)
@@ -547,10 +549,10 @@ If prefix arg is present, refresh the cache."
     (let ((packages (or doom--package-cache
                         (progn
                           (message "Reading packages...")
-                          (cl-delete-duplicates
-                           (append (mapcar 'car package-alist)
-                                   (mapcar 'car package--builtins)
-                                   (mapcar 'car package-archive-contents)))))))
+                          (delete-dups
+                           (nconc (mapcar 'car package-alist)
+                                  (mapcar 'car package--builtins)
+                                  (mapcar 'car package-archive-contents)))))))
       (setq doom--package-cache packages)
       (unless (memq guess packages)
         (setq guess nil))

@@ -3,17 +3,6 @@
 (defvar doom-warnings ())
 (defvar doom-errors ())
 
-;;; Helpers
-(defun elc-check-dir (dir)
-  (dolist (file (directory-files-recursively dir "\\.elc$"))
-    (when (file-newer-than-file-p (concat (file-name-sans-extension file) ".el")
-                                  file)
-      (warn! "%s is out-of-date" (abbreviate-file-name file)))))
-
-(defmacro assert! (condition message &rest args)
-  `(unless ,condition
-     (error! ,message ,@args)))
-
 
 ;;; Logging
 (defmacro error!   (&rest args)
@@ -29,6 +18,18 @@
 
 (defmacro explain! (&rest args)
   `(print-group! (print! (autofill ,@args))))
+
+
+;;; Helpers
+(defun elc-check-dir (dir)
+  (dolist (file (directory-files-recursively dir "\\.elc$"))
+    (when (file-newer-than-file-p (concat (file-name-sans-extension file) ".el")
+                                  file)
+      (warn! "%s is out-of-date" (abbreviate-file-name file)))))
+
+(defmacro assert! (condition message &rest args)
+  `(unless ,condition
+     (error! ,message ,@args)))
 
 
 ;;
@@ -48,9 +49,6 @@ in."
 
   ;; REVIEW Refactor me
   (print! (start "Checking your Emacs version..."))
-  (when EMACS28+
-    (warn! "Emacs %s detected. Doom doesn't support Emacs 28/HEAD. It is unstable and may cause errors."
-           emacs-version))
 
   (print! (start "Checking for Emacs config conflicts..."))
   (when (file-exists-p "~/.emacs")
@@ -97,7 +95,7 @@ in."
         ;; delays or freezing. This shouldn't happen often.
         (dolist (file (list "savehist" "projectile.cache"))
           (when-let (size (ignore-errors (doom-file-size file doom-cache-dir)))
-            (when (> size 1048576) ; larger than 1mb
+            (when (> size 1048576)      ; larger than 1mb
               (warn! "%s is too large (%.02fmb). This may cause freezes or odd startup delays"
                      file (/ size 1024 1024.0))
               (explain! "Consider deleting it from your system (manually)"))))
@@ -166,16 +164,16 @@ in."
                             (let ((doctor-file   (doom-module-path (car key) (cdr key) "doctor.el"))
                                   (packages-file (doom-module-path (car key) (cdr key) "packages.el")))
                               (cl-loop with doom-output-indent = 6
-                                       for name in (let (doom-packages
-                                                         doom-disabled-packages)
-                                                     (load packages-file 'noerror 'nomessage)
-                                                     (mapcar #'car doom-packages))
-                                       unless (or (doom-package-get name :disable)
-                                                  (eval (doom-package-get name :ignore))
-                                                  (plist-member (doom-package-get name :recipe) :local-repo)
-                                                  (doom-package-built-in-p name)
-                                                  (doom-package-installed-p name))
-                                       do (print! (error "Missing emacs package: %S") name))
+                                 for name in (let (doom-packages
+                                                   doom-disabled-packages)
+                                               (load packages-file 'noerror 'nomessage)
+                                               (mapcar #'car doom-packages))
+                                 unless (or (doom-package-get name :disable)
+                                            (eval (doom-package-get name :ignore))
+                                            (plist-member (doom-package-get name :recipe) :local-repo)
+                                            (doom-package-built-in-p name)
+                                            (doom-package-installed-p name))
+                                 do (print! (error "Missing emacs package: %S") name))
                               (let ((inhibit-message t))
                                 (load doctor-file 'noerror 'nomessage)))
                           (file-missing (error! "%s" (error-message-string ex)))

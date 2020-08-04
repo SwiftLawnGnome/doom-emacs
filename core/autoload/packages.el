@@ -1,5 +1,15 @@
 ;;; core/autoload/packages.el -*- lexical-binding: t; -*-
 
+(require 'core-packages)
+(require 'core-lib)
+(require 'core-modules)
+(eval-when-compile (require 'straight))
+(defvar straight-vc-git-default-branch)
+
+(declare-function doom-plist-merge "plist")
+(declare-function doom-point-in-string-or-comment-p "text")
+(declare-function doom-glob "files")
+
 ;;;###autoload
 (defun doom/reload-packages ()
   "Reload `doom-packages', `package' and `quelpa'."
@@ -16,7 +26,9 @@
 (defun doom--package-full-recipe (package plist)
   (doom-plist-merge
    (plist-get plist :recipe)
-   (or (cdr (straight-recipes-retrieve package))
+   (or (cdr (if (fboundp 'straight-recipes-retrieve) ;calm the compiler
+                (straight-recipes-retrieve package)
+              (error 'void-function '(straight-recipes-retrieve))))
        (plist-get (cdr (assq package doom-packages))
                   :recipe))))
 
@@ -74,7 +86,7 @@
 Grabs the latest commit id of the package using 'git'."
   (interactive "P")
   (doom-initialize-packages)
-  (cl-destructuring-bind (&key package plist beg end)
+  (cl-destructuring-bind (&key package plist _beg end)
       (or (doom--package-at-point)
           (user-error "Not on a `package!' call"))
     (let* ((recipe (doom--package-full-recipe package plist))
@@ -82,8 +94,9 @@ Grabs the latest commit id of the package using 'git'."
                        straight-vc-git-default-branch))
            (oldid (or (plist-get plist :pin)
                       (doom-package-get package :pin)))
-           (url (straight-vc-git--destructure recipe (upstream-repo upstream-host)
-                  (straight-vc-git--encode-url upstream-repo upstream-host)))
+           (url (with-no-warnings       ;; binds obsolete variables
+                  (straight-vc-git--destructure recipe (upstream-repo upstream-host)
+                    (straight-vc-git--encode-url upstream-repo upstream-host))))
            (id (or (when url
                      (cdr (doom-call-process
                            "git" "ls-remote" url
@@ -117,6 +130,7 @@ Grabs the latest commit id of the package using 'git'."
   "Inserts or updates a `:pin' for the `package!' statement at point.
 Grabs the latest commit id of the package using 'git'."
   (interactive "P")
+  (ignore select)
   (save-excursion
     (goto-char (point-min))
     (doom-initialize-packages)
@@ -143,14 +157,11 @@ each package."
   (interactive
    (let* ((module (completing-read
                    "Bump module: "
-                   (let ((modules (doom-module-list 'all)))
-                     (mapcar (lambda (m)
-                               (if (listp m)
-                                   (format "%s %s" (car m) (cdr m))
-                                 (format "%s" m)))
-                             (append '(:private :core)
-                                     (delete-dups (mapcar #'car modules))
-                                     modules)))
+                   (doom-list* ":private" ":core"
+                               (delete-dups (mapcan (lambda (x)
+                                                      (let ((cat (symbol-name (car x))))
+                                                        (list cat (concat cat " " (symbol-name (cdr x))))))
+                                                    (doom-module-list 'all))))
                    nil t nil nil))
           (module (split-string module " " t)))
      (list (intern (car module))
@@ -170,9 +181,8 @@ each package."
             (message "Module %s has no packages.el file" (cons cat mod))))
         (if module
             (list (cons category module))
-          (cl-remove-if-not (lambda (m) (eq (car m) category))
-                            (append '((:core) (:private))
-                                    (doom-module-list 'all))))))
+          (doom-keep (lambda (m) (eq (car m) category))
+                     `((:core) (:private) ,@(doom-module-list 'all))))))
 
 ;;;###autoload
 (defun doom/bump-package (package)

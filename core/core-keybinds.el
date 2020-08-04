@@ -5,6 +5,25 @@
 ;; never loaded, then evil bindings set with `map!' are ignored (i.e. omitted
 ;; entirely for performance reasons).
 
+(require 'core-vars)
+(require 'general)
+(eval-when-compile
+  (require 'core-modules)
+  (require 'use-package))
+
+(declare-function general-def "general")
+(declare-function general-unbind "general")
+(declare-function doom-unquote "core-lib")
+(declare-function general--extended-def-p "general")
+(declare-function general--extract-def "general")
+(declare-function general--normalize-extended-def "general")
+(declare-function general-override-mode "general")
+(declare-function which-key-prefix-then-key-order "which-key")
+(declare-function which-key-setup-side-window-bottom "which-key")
+(declare-function which-key-add-key-based-replacements "which-key")
+(declare-function doom-keyword-name "core-lib")
+(declare-function doom-enlist "core-lib")
+
 (defvar doom-leader-key "SPC"
   "The leader prefix key for Evil users.")
 
@@ -27,11 +46,15 @@ and Emacs states, and for non-evil users.")
 ;;; Keybind settings
 
 (cond (IS-MAC
-       (setq mac-command-modifier 'super
-             mac-option-modifier  'meta))
+       (and (boundp 'mac-command-modifier)
+            (boundp 'mac-option-modifier)
+            (setq mac-command-modifier 'super
+                  mac-option-modifier  'meta)))
       (IS-WINDOWS
-       (setq w32-lwindow-modifier 'super
-             w32-rwindow-modifier 'super)))
+       (and (boundp 'w32-lwindow-modifier)
+            (boundp 'w32-rwindow-modifier)
+            (setq w32-lwindow-modifier 'super
+                  w32-rwindow-modifier 'super))))
 
 
 ;;
@@ -77,7 +100,8 @@ all hooks after it are ignored.")
 ;;; General + leader/localleader keys
 
 (use-package general
-  :init
+  :no-require t
+  :config
   ;; Convenience aliases
   (defalias 'define-key! #'general-def)
   (defalias 'undefine-key! #'general-unbind))
@@ -96,9 +120,33 @@ all hooks after it are ignored.")
           (when prefix
             (setq key `(general--concat t ,prefix ,key)))
           (let* ((udef (cdr-safe (doom-unquote def)))
-                 (bdef (if (general--extended-def-p udef)
-                           (general--extract-def (general--normalize-extended-def udef))
-                         def)))
+                 (bdef ;; (if (and (consp udef) ;; inlined, faster `general--extended-def-p'
+                       ;;          (not (memq (car udef) '(closure function keymap menu-item)))
+                       ;;          (let ((d udef))
+                       ;;            (while (and (not (keywordp (car d)))
+                       ;;                        (consp (setq d (cdr d)))))
+                       ;;            (consp d)))
+                       ;;     (general--extract-def (general--normalize-extended-def udef))
+                       ;;   def)
+                   (cond
+                     ((not (and (consp udef) ;; inlined, faster `general--extended-def-p'
+                                (not (memq (car udef) '(closure function keymap menu-item)))
+                                (let ((d udef))
+                                  (while (and (not (keywordp (car d)))
+                                              (consp (setq d (cdr d)))))
+                                  (consp d))))
+                      def)
+                     ;; inlined, faster `general--extract-def' + `general--normalize-extended-def'
+                     ((plist-get (if (keywordp (car udef))
+                                     udef
+                                   (push :def udef))
+                                 :ignore)
+                      :ignore)
+                     (t (cadr (or (plist-member udef :def)
+                                  (plist-member udef :keymap)
+                                  (plist-member udef :prefix-command)
+                                  (plist-member udef :prefix-map)))))
+                   ))
             (unless (eq bdef :ignore)
               (push `(define-key doom-leader-map (general--kbd ,key)
                        ,bdef)
@@ -106,14 +154,17 @@ all hooks after it are ignored.")
             (when-let (desc (cadr (memq :which-key udef)))
               (prependq!
                wkforms `((which-key-add-key-based-replacements
-                           (general--concat t doom-leader-alt-key ,key)
-                           ,desc)
+                             (general--concat t doom-leader-alt-key ,key)
+                             ,desc)
                          (which-key-add-key-based-replacements
-                           (general--concat t doom-leader-key ,key)
-                           ,desc))))))))
+                             (general--concat t doom-leader-key ,key)
+                             ,desc))))))))
     (macroexp-progn
-     (append (and wkforms `((after! which-key ,@(nreverse wkforms))))
-             (nreverse forms)))))
+     (if wkforms
+         (cons `(after! which-key
+                  ,@(nreverse wkforms))
+               (nreverse forms))
+       (nreverse forms)))))
 
 (defmacro define-leader-key! (&rest args)
   "Define <leader> keys.
@@ -163,31 +214,37 @@ localleader prefix."
   (defun doom-init-leader-keys-h ()
     "Bind `doom-leader-key' and `doom-leader-alt-key'."
     (let ((map general-override-mode-map))
-      (if (not (featurep 'evil))
+      (if (and (featurep 'evil)
+               (fboundp 'evil-define-key*))
           (progn
-            (cond ((equal doom-leader-alt-key "C-c")
-                   (set-keymap-parent doom-leader-map mode-specific-map))
-                  ((equal doom-leader-alt-key "C-x")
-                   (set-keymap-parent doom-leader-map ctl-x-map)))
-            (define-key map (kbd doom-leader-alt-key) 'doom/leader))
-        (evil-define-key* '(normal visual motion) map (kbd doom-leader-key) 'doom/leader)
-        (evil-define-key* '(emacs insert) map (kbd doom-leader-alt-key) 'doom/leader))
+            (evil-define-key* '(normal visual motion) map (kbd doom-leader-key) 'doom/leader)
+            (evil-define-key* '(emacs insert) map (kbd doom-leader-alt-key) 'doom/leader))
+        (cond ((equal doom-leader-alt-key "C-c")
+               (set-keymap-parent doom-leader-map mode-specific-map))
+              ((equal doom-leader-alt-key "C-x")
+               (set-keymap-parent doom-leader-map ctl-x-map)))
+        (define-key map (kbd doom-leader-alt-key) 'doom/leader))
       (general-override-mode +1))))
 
 
 ;;
 ;;; Packages
 
+(eval-when-compile
+  (autoload 'which-key-prefix-then-key-order "which-key")
+  (autoload 'which-key-setup-side-window-bottom "which-key")
+  (autoload 'which-key-add-key-based-replacements "which-key"))
+
 (use-package! which-key
   :hook (doom-first-input . which-key-mode)
   :init
+  :config
   (setq which-key-sort-order #'which-key-prefix-then-key-order
         which-key-sort-uppercase-first nil
         which-key-add-column-padding 1
         which-key-max-display-columns nil
         which-key-min-display-lines 6
         which-key-side-window-slot -10)
-  :config
   ;; general improvements to which-key readability
   (set-face-attribute 'which-key-local-map-description-face nil :weight 'bold)
   (which-key-setup-side-window-bottom)

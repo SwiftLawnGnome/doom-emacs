@@ -1,8 +1,14 @@
 ;;; core/autoload/projects.el -*- lexical-binding: t; -*-
 
+(eval-when-compile (require 'core-lib))
+(require 'core-modules)
+
 (defvar projectile-project-root nil)
 (defvar projectile-enable-caching)
 (defvar projectile-require-project-root)
+(defvar projectile-project-name-function)
+(defvar projectile-project-types)
+(declare-function project-find-file-in "project")
 
 ;;;###autoload (autoload 'projectile-relevant-known-projects "projectile")
 
@@ -94,10 +100,13 @@ Returns '-' if not in a valid project."
   "Jump to a file in DIR (searched recursively).
 
 If DIR is not a project, it will be indexed (but not cached)."
+  ;; the errors are borrowed from `directory-files'
+  (unless (file-exists-p dir)
+    (signal 'file-missing (list "Opening directory" "No such file or directory" dir)))
   (unless (file-directory-p dir)
-    (error "Directory %S does not exist" dir))
+    (signal 'file-error (list "Opening directory" "Not a directory" dir)))
   (unless (file-readable-p dir)
-    (error "Directory %S isn't readable" dir))
+    (signal 'file-error (list "Opening directory" "Directory is not readable" dir)))
   (let* ((default-directory (file-truename (expand-file-name dir)))
          (projectile-project-root (doom-project-root default-directory))
          (projectile-enable-caching projectile-enable-caching))

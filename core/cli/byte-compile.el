@@ -1,5 +1,11 @@
 ;;; core/cli/byte-compile.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(require 'core-lib)
+(defvar use-package-compute-statistics)
+(defvar use-package-defaults)
+(defvar use-package-expand-minimally)
+
 (defcli! (compile c)
     ((recompile-p ["-r" "--recompile"])
      (core-p      ["-c" "--core"])
@@ -17,17 +23,15 @@ and your private config files, respectively. To recompile your packages, use
   (doom-cli-byte-compile
    (if (or core-p private-p)
        (append (when core-p
-                 (list (doom-glob doom-emacs-dir "init.el")
-                       doom-core-dir))
-               (when private-p
-                 (list doom-private-dir)))
-     (append (list (doom-glob doom-emacs-dir "init.el")
-                   doom-core-dir)
-             (cl-remove-if-not
-              ;; Only compile Doom's modules
-              (lambda (path) (file-in-directory-p path doom-emacs-dir))
-              ;; Omit `doom-private-dir', which is always first
-              (cdr (doom-module-load-path)))))
+                 (list (doom-glob doom-emacs-dir "init.el") doom-core-dir))
+               (when private-p (list doom-private-dir)))
+     (doom-list* (doom-glob doom-emacs-dir "init.el")
+                 doom-core-dir
+                 (doom-keep
+                  ;; Only compile Doom's modules
+                  (lambda (path) (file-in-directory-p path doom-emacs-dir))
+                  ;; Omit `doom-private-dir', which is always first
+                  (cdr (doom-module-load-path)))))
    recompile-p
    verbose-p))
 
@@ -43,7 +47,8 @@ and your private config files, respectively. To recompile your packages, use
 (defun doom--byte-compile-ignore-file-p (path)
   (let ((filename (file-name-nondirectory path)))
     (or (not (equal (file-name-extension path) "el"))
-        (member filename (list "packages.el" "doctor.el"))
+        (equal filename "packages.el")
+        (equal filename "doctor.el")
         (string-prefix-p "." filename)
         (string-prefix-p "test-" filename)
         (string-prefix-p "flycheck_" filename)
@@ -80,11 +85,10 @@ If RECOMPILE-P is non-nil, only recompile out-of-date files."
              ;; Assemble el files we want to compile, and preserve in the order
              ;; they are loaded in, so we don't run into any scary catch-22s
              ;; while byte-compiling, like missing macros.
-             (cons (let ((target-dirs (cl-remove-if-not #'file-directory-p targets)))
+             (cons (let ((target-dirs (doom-keep #'file-directory-p targets)))
                      (lambda (path)
                        (and (not (doom--byte-compile-ignore-file-p path))
-                            (cl-find-if (doom-partial #'file-in-directory-p path)
-                                        target-dirs)
+                            (cl-find-if (doom-partial #'file-in-directory-p path) target-dirs)
                             (cl-pushnew path targets))))
                    after-load-functions))))
       (doom-log "Reloading Doom in preparation for byte-compilation")
@@ -101,12 +105,13 @@ If RECOMPILE-P is non-nil, only recompile out-of-date files."
       (print! (start "%scompiling your config...")
               (if recompile-p "Re" "Byte-"))
 
-      (dolist (dir
-               (cl-remove-if-not #'file-directory-p targets)
-               (setq targets (cl-remove-if #'file-directory-p targets)))
-        (prependq! targets
-                   (doom-files-in
-                    dir :match "\\.el" :filter #'doom--byte-compile-ignore-file-p)))
+      (dolist (dir targets
+               (setq targets (doom-remove #'file-directory-p targets)))
+        (when (file-directory-p dir)
+          (prependq! targets
+                     (doom-files-in dir
+                                    :match "\\.el"
+                                    :filter #'doom--byte-compile-ignore-file-p))))
 
       (print-group!
        (require 'use-package)

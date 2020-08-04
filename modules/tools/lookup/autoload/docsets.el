@@ -1,9 +1,17 @@
 ;;; tools/lookup/autoload/docsets.el -*- lexical-binding: t; -*-
 ;;;###if (featurep! +docsets)
 
+(eval-when-compile
+  (require 'core-modules))
+(require 'core-lib)
+
 (defvar dash-docs-docsets)
 (defvar dash-docs-common-docsets)
 (defvar dash-docs-browser-func)
+(defvar +lookup-open-url-fn)
+(declare-function dash-docs-docset-path "dash-docs")
+(declare-function dash-docs-installed-docsets "dash-docs")
+(declare-function doom-thing-at-point-or-region "text")
 
 ;;;###autodef
 (defun set-docsets! (modes &rest docsets)
@@ -73,8 +81,8 @@ Docsets must be installed with one of the following commands:
 
 Docsets can be searched directly via `+lookup/in-docsets'."
   (when (require 'dash-docs nil t)
-    (when-let (docsets (cl-remove-if-not #'dash-docs-docset-path
-                                         (bound-and-true-p dash-docs-docsets)))
+    (when-let (docsets (doom-keep #'dash-docs-docset-path
+                                  (bound-and-true-p dash-docs-docsets)))
       (+lookup/in-docsets nil identifier docsets)
       'deferred)))
 
@@ -98,7 +106,7 @@ installed with `dash-docs-install-docset'."
         (dash-docs-docsets
          (if arg
              (dash-docs-installed-docsets)
-           (cl-remove-if-not #'dash-docs-docset-path (or docsets dash-docs-docsets))))
+           (doom-keep #'dash-docs-docset-path (or docsets dash-docs-docsets))))
         (query (doom-thing-at-point-or-region query)))
     (doom-log "Searching docsets %s" dash-docs-docsets)
     (cond ((featurep! :completion helm)

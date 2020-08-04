@@ -1,5 +1,11 @@
 ;;; lang/haskell/+lsp.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-modules)
+  (require 'use-package))
+
+(declare-function lsp! "common")
+
 (use-package! lsp-haskell
   :after lsp-clients
   :preface (add-hook 'haskell-mode-local-vars-hook #'lsp!)
