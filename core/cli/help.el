@@ -1,6 +1,8 @@
 ;;; core/cli/help.el -*- lexical-binding: t; -*-
 
 (require 'core-lib)
+(eval-and-compile (require 'core-cli-lib))
+(require 'core-output)
 
 (defun doom--cli-print-signature (cli)
   (print! (bold "Usage: doom %s%s%s")
@@ -9,7 +11,7 @@
             (concat (doom-cli-name cli) " "))
           (if-let* ((optlist (doom-cli-optlist cli))
                     (flags (cl-loop for opt in optlist
-                                    append (doom-cli-option-flags opt)))
+                              append (doom-cli-option-flags opt)))
                     (fn (apply-partially #'string-prefix-p "--")))
               (concat (when-let (short-flags (doom-remove fn flags))
                         ;; TODO Show arguments of short flags
@@ -23,11 +25,11 @@
             "")
           (if-let (arglist (doom-cli-arglist cli))
               (string-join (append (cl-loop for arg in arglist
-                                            until (memq arg cl--lambda-list-keywords)
-                                            collect (upcase (symbol-name arg)))
+                                      until (memq arg cl--lambda-list-keywords)
+                                      collect (upcase (symbol-name arg)))
                                    (cl-loop for arg in (cdr (memq '&optional arglist))
-                                            until (memq arg cl--lambda-list-keywords)
-                                            collect (format "[%s]" (upcase (symbol-name arg)))))
+                                      until (memq arg cl--lambda-list-keywords)
+                                      collect (format "[%s]" (upcase (symbol-name arg)))))
                            " ")
             ""))
   (when-let (aliases (doom-cli-aliases cli))

@@ -5,7 +5,8 @@
 (declare-function print! "output")
 (defvar straight--build-cache)
 (eval-when-compile
-  (load (concat doom-emacs-dir "core/autoload/output.el") nil t)
+  ;; (load (concat doom-emacs-dir "core/autoload/output.el") nil t)
+  (require 'core-output)
   (require 'core-lib)
   ;; ppss accessors
   ;; `eval-when-compile' cuz compiler macro

@@ -8,7 +8,7 @@
 (defconst doom-version "2.0.9"
   "Current version of Doom Emacs.")
 
-(with-no-warnings ;; no prefix
+(with-suppressed-warnings ((lexical EMACS27+ EMACS28+)) ;; no prefix
   (defconst EMACS27+ (> emacs-major-version 26))
   (defconst EMACS28+ (> emacs-major-version 27)))
 (defconst IS-MAC     (eq system-type 'darwin))

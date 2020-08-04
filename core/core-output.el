@@ -1,6 +1,6 @@
-;;; core/autoload/output.el -*- lexical-binding: t; -*-
+;;; core/core-output.el -*- lexical-binding: t; -*-
 
-(require 'core)
+(require 'core-vars)
 
 (defvar doom-output-ansi-alist
   '(;; fx
@@ -270,3 +270,6 @@ DEST can be one or more of `standard-output', a buffer, a file"
                   (with-temp-file dest
                     (insert-buffer-substring log-buffer))))
            (kill-buffer log-buffer))))))
+
+(provide 'core-output)
+;;; core-output.el ends here
