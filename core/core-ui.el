@@ -147,13 +147,13 @@ An omitted font size means to inherit `doom-font''s size.")
 
 (defun doom-highlight-non-default-indentation-h ()
   "Highlight whitespace at odds with `indent-tabs-mode'.
-That is, highlight tabs if the usual indentation is with spaces, and highlight
-spaces at the beginnings of lines if the usual indentation is with tabs.
+That is, highlight tabs if `indent-tabs-mode' is `nil', and highlight spaces at
+the beginnings of lines if `indent-tabs-mode' is `t'. The purpose is to make
+incorrect indentation in the current buffer obvious to you.
 
 Does nothing if `whitespace-mode' or `global-whitespace-mode' is already active
 or if the current buffer is read-only or not file-visiting."
   (unless (or (eq major-mode 'fundamental-mode)
-              buffer-read-only
               (bound-and-true-p global-whitespace-mode)
               (null buffer-file-name))
     (require 'whitespace)

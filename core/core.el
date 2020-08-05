@@ -246,6 +246,11 @@ config.el instead."
 (setq-default bidi-display-reordering 'left-to-right
               bidi-paragraph-direction 'left-to-right)
 
+;; Disabling the BPA makes redisplay faster, but might produce incorrect display
+;; reordering of bidirectional text with embedded parentheses and other bracket
+;; characters whose 'paired-bracket' Unicode property is non-nil.
+(setq bidi-inhibit-bpa t)  ; Emacs 27 only
+
 ;; Reduce rendering/line scan work for Emacs by not rendering cursors or regions
 ;; in non-focused windows.
 (setq-default cursor-in-non-selected-windows nil)
@@ -313,10 +318,14 @@ config.el instead."
 ;; File+dir local variables are initialized after the major mode and its hooks
 ;; have run. If you want hook functions to be aware of these customizations, add
 ;; them to MODE-local-vars-hook instead.
+(defvar doom--inhibit-local-var-hooks nil)
+
 (defun doom-run-local-var-hooks-h ()
   "Run MODE-local-vars-hook after local variables are initialized."
-  (run-hook-wrapped (intern-soft (format "%s-local-vars-hook" major-mode))
-                    #'doom-try-run-hook))
+  (unless doom--inhibit-local-var-hooks
+    (set (make-local-variable 'doom--inhibit-local-var-hooks) t)
+    (run-hook-wrapped (intern-soft (format "%s-local-vars-hook" major-mode))
+                      #'doom-try-run-hook)))
 
 ;; If the user has disabled `enable-local-variables', then
 ;; `hack-local-variables-hook' is never triggered, so we trigger it at the end
@@ -482,9 +491,13 @@ to least)."
       (file-missing
        ;; If the autoloads file fails to load then the user forgot to sync, or
        ;; aborted a doom command midway!
-       (signal 'doom-error
-               (list "Doom is in an incomplete state"
-                     "run 'bin/doom sync' on the command line to repair it"))))
+       (if (equal (nth 3 e) doom-autoload-file)
+           (signal 'doom-error
+                   (list "Doom is in an incomplete state"
+                         "run 'bin/doom sync' on the command line to repair it"))
+         ;; Otherwise, something inside the autoloads file is triggering this
+         ;; error; forward it!
+         (apply #'doom-autoload-error e))))
 
     ;; Load shell environment, optionally generated from 'doom env'. No need
     ;; to do so if we're in terminal Emacs, where Emacs correctly inherits

@@ -145,6 +145,8 @@ possible."
       backup-directory-alist `((".*" . ,(concat doom-cache-dir "backup/"))))
 
 (after! tramp
+  ;; Backing up files on remotes can be incredibly slow and prone to a variety
+  ;; of IO errors. Better to disable it altogether in tramp buffers:
   (add-to-list 'backup-directory-alist (cons tramp-file-name-regexp nil)))
 
 (add-hook! 'after-save-hook

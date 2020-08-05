@@ -24,32 +24,33 @@ byte-compiled from.")
    (let* ((default-directory doom-private-dir)
           (org    (expand-file-name +literate-config-file))
           (dest   (concat (file-name-sans-extension +literate-config-file) ".el"))
-          (backup (make-temp-file "config.org.backup")))
-     (and (require 'ox)
-          (require 'ob-tangle)
-          (unwind-protect
+          ;; Operate on a copy because `org-babel-tangle' has side-effects we
+          ;; don't want to impose on the User's config permanently.
+          (backup (make-temp-file (concat (file-name-nondirectory org) "."))))
+     (unwind-protect
+         (and (require 'ox)
+              (require 'ob-tangle)
               (letf! ((defun message (msg &rest args)
                         (when msg
                           (print! (info "%s") (apply #'format-message msg args))))
                       ;; Prevent infinite recursion due to recompile-on-save
                       ;; hooks later.
-                      ;; (org-mode-hook nil)
-                      (org-inhibit-startup t))
-                ;; Do the ol' switcheroo because `org-babel-tangle' writes
-                ;; changes to the user's literate config, which would impose on
-                ;; the user.
-                (copy-file org backup t t)
-                (with-current-buffer (find-file-noselect org)
-                  ;; Tangling won't ordinarily expand #+INCLUDE directives, so
-                  ;; we do it ourselves.
-                  (delay-mode-hooks
+                      (org-mode-hook nil))
+                ;; Tangling won't ordinarily expand #+INCLUDE directives, and it
+                ;; modifies the buffer so we must do it in a copy to prevent
+                ;; stepping on the user's toes.
+                (with-temp-file backup
+                  (let ((buffer-file-name backup)
+                        (org-inhibit-startup t)
+                        org-mode-hook)
+                    (insert-file-contents org)
+                    (org-mode)
                     (org-export-expand-include-keyword)
                     (org-babel-tangle nil dest)))
                 t)
-            (ignore-errors (copy-file backup org t t))
-            (ignore-errors (delete-file backup)))
-          ;; Write an empty file to serve as our mtime cache
-          (with-temp-file +literate-config-cache-file)))))
+              ;; Write an empty file to serve as our mtime cache
+              (with-temp-file +literate-config-cache-file))
+       (ignore-errors (delete-file backup))))))
 
 ;;;###autoload
 (add-hook 'org-mode-hook #'+literate-enable-recompile-h)

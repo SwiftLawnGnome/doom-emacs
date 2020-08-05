@@ -24,6 +24,7 @@
 ;;; Bump commands
 
 (defun doom--package-full-recipe (package plist)
+  (require 'straight)
   (doom-plist-merge
    (plist-get plist :recipe)
    (or (cdr (if (fboundp 'straight-recipes-retrieve) ;calm the compiler
