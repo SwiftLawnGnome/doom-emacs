@@ -4,8 +4,10 @@
 ;;; Helpers
 
 (require 'macroexp)
-(eval-when-compile (require 'pcase)
-                   (require 'inline))
+(eval-when-compile
+  (require 'pcase)
+  (require 'inline))
+(require 'core-vars)
 
 (defun doom--resolve-hook-forms (hooks)
   "Converts a list of modes into a list of hook symbols.
@@ -223,18 +225,15 @@ the same name, for use with `funcall' or `apply'. ARGLIST and BODY are as in
   (dolist (binding (reverse bindings) (macroexpand body))
     (let ((type (car binding))
           (rest (cdr binding)))
-      (setq
-       body (pcase type
-              (`defmacro `(cl-macrolet ((,@rest)) ,body))
-              (`defun `(cl-letf* ((,(car rest) (symbol-function #',(car rest)))
-                                  ((symbol-function #',(car rest))
-                                   (lambda ,(cadr rest) ,@(cddr rest))))
-                         (ignore ,(car rest))
-                         ,body))
-              (_
-               (when (eq (car-safe type) 'function)
-                 (setq type (list 'symbol-function type)))
-               (list 'cl-letf (list (cons type rest)) body)))))))
+      (setq body (pcase type
+                   (`defmacro `(cl-macrolet ((,@rest)) ,body))
+                   (`defun `(cl-letf* ((,(car rest) (symbol-function #',(car rest)))
+                                       ((symbol-function #',(car rest)) (lambda ,@(cdr rest))))
+                              (ignore ,(car rest))
+                              ,body))
+                   (_ (when (eq (car-safe type) 'function)
+                        (setq type (list 'symbol-function type)))
+                      (list 'cl-letf (list (cons type rest)) body)))))))
 
 (defmacro quiet! (&rest forms)
   "Run FORMS without generating any output.
@@ -243,13 +242,14 @@ This silences calls to `message', `load', `write-region' and anything that
 writes to `standard-output'."
   `(if (bound-and-true-p doom-debug-p)
        (progn ,@forms)
-     ,(if (bound-and-true-p doom-interactive-p)
+     ,(if doom-interactive-p
           `(let ((inhibit-message t)
                  (save-silently t))
              (prog1 ,(macroexp-progn forms) (message "")))
         `(letf! ((standard-output (lambda (&rest _)))
                  (defun message (&rest _))
                  (defun load (file &optional noerror nomessage nosuffix must-suffix)
+                   (ignore nomessage)
                    (funcall load file noerror t nosuffix must-suffix))
                  (defun write-region (start end filename &optional append visit lockname mustbenew)
                    (funcall write-region start end filename append
@@ -396,31 +396,60 @@ This is a wrapper around `eval-after-load' that:
 2. No-ops for package that are disabled by the user (via `package!')
 3. Supports compound package statements (see below)
 4. Prevents eager expansion pulling in autoloaded macros all at once"
-  (declare (indent defun) (debug t))
-  (if (symbolp package)
-      (unless (memq package (bound-and-true-p doom-disabled-packages))
-        (list (if (or (not (bound-and-true-p byte-compile-current-file))
-                      (require package nil 'noerror))
-                  'progn
-                'with-no-warnings)
-              (let ((body (macroexp-progn body)))
-                `(if (featurep ',package)
-                     ,body
-                   ;; We intentionally avoid `with-eval-after-load' to prevent
-                   ;; eager macro expansion from pulling (or failing to pull) in
-                   ;; autoloaded macros/packages.
-                   (eval-after-load ',package ',body)))))
-    (let ((p (car package)))
-      (cond ((not (keywordp p))
-             `(after! (:and ,@package) ,@body))
-            ((memq p '(:or :any))
-             (macroexp-progn
-              (cl-loop for next in (cdr package)
-                       collect `(after! ,next ,@body))))
-            ((memq p '(:and :all))
-             (dolist (next (cdr package))
-               (setq body `((after! ,next ,@body))))
-             (car body))))))
+  (declare (indent 1) (debug t))
+  ;; (if (symbolp package)
+  ;;     (unless (memq package (bound-and-true-p doom-disabled-packages))
+  ;;       (list (if (or (not (bound-and-true-p byte-compile-current-file))
+  ;;                     (require package nil 'noerror))
+  ;;                 'progn
+  ;;               'with-no-warnings)
+  ;;             (let ((body (macroexp-progn body)))
+  ;;               `(if (featurep ',package)
+  ;;                    ,body
+  ;;                  ;; We intentionally avoid `with-eval-after-load' to prevent
+  ;;                  ;; eager macro expansion from pulling (or failing to pull) in
+  ;;                  ;; autoloaded macros/packages.
+  ;;                  (eval-after-load ',package ',body)))))
+  ;;   (let ((p (car package)))
+  ;;     (cond ((not (keywordp p))
+  ;;            `(after! (:and ,@package) ,@body))
+  ;;           ((memq p '(:or :any))
+  ;;            (macroexp-progn
+  ;;             (cl-loop for next in (cdr package)
+  ;;                      collect `(after! ,next ,@body))))
+  ;;           ((memq p '(:and :all))
+  ;;            (dolist (next (cdr package))
+  ;;              (setq body `((after! ,next ,@body))))
+  ;;            (car body)))))
+
+  ;; NOTE doing it this convoluted way prevents the same chunk of code being
+  ;; duplicated in complex PACKAGE specs
+  (let (_) ;; this is `dlet' in emacs 28
+    (defvar doom--after-func)
+    (letrec ((doom--after-func `(lambda () ,@body))
+             (letbs nil)
+             (recurse
+              (lambda (package)
+                (if (or (stringp package) (symbolp package))
+                    (unless (memq package doom-disabled-packages)
+                      `((eval-after-load ',package ,doom--after-func)))
+                  (let ((doom--after-func doom--after-func)
+                        (p (if (keywordp (car package)) (pop package) :and)))
+                    (cond
+                      ((not (cdr package)) (funcall recurse (car package)))
+                      ((memq p '(:or :any))
+                       (unless (symbolp doom--after-func)
+                         (let ((s (gensym "thunk")))
+                           (push (list s doom--after-func) letbs)
+                           (setq doom--after-func s)))
+                       (mapcan recurse package))
+                      ((memq p '(:and :all))
+                       (dolist (next (reverse (cdr package)))
+                         (setq doom--after-func
+                               `(lambda () ,@(funcall recurse next))))
+                       (funcall recurse (car package))))))))
+             (eb (macroexp-progn (funcall recurse package))))
+      (macroexp-let* (nreverse letbs) eb))))
 
 (defun doom--handle-load-error (e target path)
   (let* ((source (file-name-sans-extension target))
@@ -550,7 +579,8 @@ advised)."
     ;;          ((symbolp sym)
     ;;           (put ',fn 'permanent-local-hook t)
     ;;           (add-hook sym #',fn ,append))))
-    ;; NOTE in the 99% case where HOOK-OR-FUNCTION is a constant, let this be a toplevel form
+    ;; NOTE in the 99% case where HOOK-OR-FUNCTION is a constant, avoid let to
+    ;; allow this to be a toplevel form
     (macroexp-let2 nil sym hook-or-function
       `(progn
          (defun ,fn (&rest _)
@@ -569,7 +599,9 @@ advised)."
 (defmacro add-hook-trigger! (hook-var &rest targets)
   "TODO"
   `(let ((fn (intern (format "%s-h" ,hook-var))))
-     (fset fn (lambda (&rest _) (run-hooks ,hook-var) (set ,hook-var nil)))
+     (fset fn (lambda (&rest _)
+                (run-hooks ,hook-var)
+                (set ,hook-var nil)))
      (put ,hook-var 'permanent-local t)
      (dolist (on (list ,@targets))
        (if (functionp on)
@@ -666,9 +698,10 @@ If N and M = 1, there's no benefit to using this macro over `remove-hook'.
 \(fn HOOKS &rest [SYM VAL]...)"
   (declare (indent 1))
   (macroexp-progn
-   (cl-loop for (_var _val hook fn)
-            in (doom--setq-hook-fns hooks vars 'singles)
-            collect `(remove-hook ',hook ',fn))))
+   (cl-loop
+      for (_var _val hook fn)
+      in (doom--setq-hook-fns hooks vars 'singles)
+      collect `(remove-hook ',hook ',fn))))
 
 
 ;;; Definers
@@ -690,10 +723,9 @@ DOCSTRING and BODY are as in `defun'.
             where-alist))
     `(progn
        (defun ,symbol ,arglist ,docstring ,@body)
-       (when (fboundp ',symbol)         ;compiler
-         (dolist (targets (list ,@(nreverse where-alist)))
-           (dolist (target (cdr targets))
-             (advice-add target (car targets) #',symbol)))))))
+       (dolist (targets (list ,@(nreverse where-alist)))
+         (dolist (target (cdr targets))
+           (advice-add target (car targets) ',symbol))))))
 
 (defmacro undefadvice! (symbol _arglist &optional docstring &rest body)
   "Undefine an advice called SYMBOL.

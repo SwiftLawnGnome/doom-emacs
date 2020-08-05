@@ -183,23 +183,45 @@
 
 ;; Don't litter `doom-emacs-dir'. We don't use `no-littering' because it's a
 ;; mote too opinionated for our needs.
-(setq abbrev-file-name             (concat doom-local-dir "abbrev.el")
-      async-byte-compile-log-file  (concat doom-etc-dir "async-bytecomp.log")
-      bookmark-default-file        (concat doom-etc-dir "bookmarks")
-      custom-file                  (concat doom-private-dir "custom.el")
+(setq custom-file                  (concat doom-private-dir "custom.el")
       custom-theme-directory       (concat doom-private-dir "themes/")
-      desktop-dirname              (concat doom-etc-dir "desktop")
-      desktop-base-file-name       "autosave"
-      desktop-base-lock-name       "autosave-lock"
-      pcache-directory             (concat doom-cache-dir "pcache/")
-      request-storage-directory    (concat doom-cache-dir "request")
-      shared-game-score-directory  (concat doom-etc-dir "shared-game-score/")
-      tramp-auto-save-directory    (concat doom-cache-dir "tramp-auto-save/")
-      tramp-backup-directory-alist backup-directory-alist
-      tramp-persistency-file-name  (concat doom-cache-dir "tramp-persistency.el")
-      url-cache-directory          (concat doom-cache-dir "url/")
-      url-configuration-directory  (concat doom-etc-dir "url/")
-      gamegrid-user-score-file-directory (concat doom-etc-dir "games/"))
+      shared-game-score-directory  (concat doom-etc-dir "shared-game-score/"))
+
+(with-eval-after-load 'desktop
+  (setq desktop-dirname (concat doom-etc-dir "desktop"))
+  (setq desktop-base-file-name "autosave")
+  (setq desktop-base-lock-name "autosave-lock"))
+
+(with-eval-after-load 'bookmark
+  (setq bookmark-default-file (concat doom-etc-dir "bookmarks")))
+
+(with-eval-after-load 'abbrev
+  (setq abbrev-file-name (concat doom-local-dir "abbrev.el")))
+
+(with-eval-after-load 'url-cache
+  (setq url-cache-directory (concat doom-cache-dir "url/")))
+
+(with-eval-after-load 'url
+  (setq url-configuration-directory (concat doom-etc-dir "url/")))
+
+(with-eval-after-load 'gamegrid
+  (setq gamegrid-user-score-file-directory (concat doom-etc-dir "games/")))
+
+(with-eval-after-load 'request
+  (setq request-storage-directory (concat doom-cache-dir "request")))
+
+(with-eval-after-load 'tramp
+  (setq tramp-auto-save-directory (concat doom-cache-dir "tramp-auto-save/"))
+  (setq tramp-backup-directory-alist backup-directory-alist))
+
+(with-eval-after-load 'tramp-cache
+  (setq tramp-persistency-file-name (concat doom-cache-dir "tramp-persistency.el")))
+
+(with-eval-after-load 'async-bytecomp
+  (setq async-byte-compile-log-file (concat doom-etc-dir "async-bytecomp.log")))
+
+(with-eval-after-load 'pcache
+  (setq pcache-directory (concat doom-cache-dir "pcache/")))
 
 ;; HACK Stop sessions from littering the user directory
 (defadvice! doom--use-cache-dir-a (session-id)
@@ -240,7 +262,8 @@ config.el instead."
 (setq frame-inhibit-implied-resize t)
 
 ;; Don't ping things that look like domain names.
-(setq ffap-machine-p-known 'reject)
+(with-eval-after-load 'ffap
+  (setq ffap-machine-p-known 'reject))
 
 ;; Font compacting can be terribly expensive, especially for rendering icon
 ;; fonts on Windows. Whether it has a notable affect on Linux and Mac hasn't
@@ -480,16 +503,40 @@ to least)."
     (autoload 'doom-initialize-packages "core-packages")
     (autoload 'doom-initialize-core-packages "core-packages")
     (with-eval-after-load 'package (require 'core-packages))
-    (with-eval-after-load 'straight (doom-initialize-packages))
+    (eval-after-load 'straight #'doom-initialize-packages)
+    ;; (with-eval-after-load 'straight (doom-initialize-packages))
 
     ;; Bootstrap the interactive session
     (add-hook! 'window-setup-hook
       (add-hook 'hack-local-variables-hook #'doom-run-local-var-hooks-h)
       (add-hook 'after-change-major-mode-hook #'doom-run-local-var-hooks-maybe-h 'append)
       (add-hook 'doom-first-input-hook #'gcmh-mode)
-      (add-hook-trigger! 'doom-first-input-hook 'pre-command-hook)
-      (add-hook-trigger! 'doom-first-file-hook 'after-find-file 'dired-initial-position-hook)
-      (add-hook-trigger! 'doom-first-buffer-hook 'after-find-file 'doom-switch-buffer-hook))
+      (letrec ((run-input-hook
+                (lambda (&rest _)
+                  (run-hooks 'doom-first-input-hook)
+                  (setq doom-first-input-hook nil)
+                  (remove-hook 'doom-first-input-hook run-input-hook))))
+        (add-hook 'pre-command-hook run-input-hook))
+      ;; (add-hook-trigger! 'doom-first-input-hook 'pre-command-hook)
+      (letrec ((run-file-hook
+                (lambda (&rest _)
+                  (run-hooks 'doom-first-file-hook)
+                  (setq doom-first-file-hook nil)
+                  (remove-hook 'dired-initial-position-hook run-file-hook)
+                  (advice-remove 'after-find-file run-file-hook))))
+        (add-hook 'dired-initial-position-hook run-file-hook)
+        (advice-add 'after-find-file :before run-file-hook))
+      ;; (add-hook-trigger! 'doom-first-file-hook 'after-find-file 'dired-initial-position-hook)
+      (letrec ((run-buffer-hook
+                (lambda (&rest _)
+                  (run-hooks 'doom-first-buffer-hook)
+                  (setq doom-first-buffer-hook nil)
+                  (remove-hook 'doom-switch-buffer-hook run-buffer-hook)
+                  (advice-remove 'after-find-file run-buffer-hook))))
+        (add-hook 'doom-switch-buffer-hook run-buffer-hook)
+        (advice-add 'after-find-file :before run-buffer-hook))
+      ;; (add-hook-trigger! 'doom-first-buffer-hook 'after-find-file 'doom-switch-buffer-hook)
+      )
     (add-hook 'emacs-startup-hook #'doom-load-packages-incrementally-h)
     (add-hook 'window-setup-hook #'doom-display-benchmark-h 'append)
     (if doom-debug-p (doom-debug-mode +1))

@@ -1,5 +1,13 @@
 ;;; tools/magit/autoload.el -*- lexical-binding: t; -*-
 
+(require 'core-vars)
+(eval-when-compile (require 'core-lib))
+(defvar +magit-default-clone-url)
+(declare-function magit-clone-regular "magit-clone")
+(declare-function ghub--host "ghub")
+(declare-function ghub--username "ghub")
+(declare-function magit-mode-get-buffers "magit-mode")
+
 ;; HACK Magit complains loudly (but harmlessly) when it can't determine its own
 ;;      version in a sparse clone. This was fixed upstream in
 ;;      magit/magit@b1b2683, but only for macOS and Linux users. Windows doesn't
@@ -44,10 +52,9 @@
                             0.7)))
                 `(display-buffer-below-selected
                   . ((window-height . ,(truncate (* (window-height) size)))))))
-
              ;; Everything else should reuse the current window.
              ((or (not (derived-mode-p 'magit-mode))
-                  (not (memq (with-current-buffer buffer major-mode)
+                  (not (memq buffer-mode
                              '(magit-process-mode
                                magit-revision-mode
                                magit-diff-mode
@@ -99,7 +106,8 @@ modified."
   "Clean up magit buffers after quitting `magit-status' and refresh version
 control in buffers."
   (interactive "P")
-  (funcall magit-bury-buffer-function kill-buffer)
+  (bound! (magit-bury-buffer-function)
+    (funcall magit-bury-buffer-function kill-buffer))
   (unless (delq nil
                 (mapcar (lambda (win)
                           (with-selected-window win
@@ -110,7 +118,7 @@ control in buffers."
 
 (defun +magit--kill-buffer (buf)
   "TODO"
-  (when (and (bufferp buf) (buffer-live-p buf))
+  (when (buffer-live-p buf)
     (let ((process (get-buffer-process buf)))
       (if (not (processp process))
           (kill-buffer buf)
@@ -124,9 +132,11 @@ control in buffers."
 (defun +magit/start-github-review (arg)
   (interactive "P")
   (call-interactively
-    (if (or arg (not (featurep 'forge)))
-        #'github-review-start
-      #'github-review-forge-pr-at-point)))
+   (if (and (fboundp 'github-review-start)
+            (or arg (not (featurep 'forge))))
+       #'github-review-start
+     (bound! (#'github-review-forge-pr-at-point)
+       #'github-review-forge-pr-at-point))))
 
 (defvar +magit-clone-history nil
   "History for `+magit/clone' prompt.")
@@ -140,21 +150,24 @@ control in buffers."
   (interactive
    (progn
      (require 'ghub)
-     (let* ((user (ghub--username (ghub--host)))
-            (repo (read-from-minibuffer
-                   "Clone repository (user/repo or url): "
-                   (if user (concat user "/"))
-                   nil nil '+magit-clone-history))
-            (name (car (last (split-string repo "/" t)))))
-       (list repo
-             (read-directory-name
-              "Destination: "
-              magit-clone-default-directory
-              name nil name)))))
+     (require 'magit-clone)
+     (bound! (#'ghub--username #'ghub--host magit-clone-default-directory)
+       (let* ((user (ghub--username (ghub--host)))
+              (repo (read-from-minibuffer
+                     "Clone repository (user/repo or url): "
+                     (if user (concat user "/"))
+                     nil nil '+magit-clone-history))
+              (name (car (last (split-string repo "/" t)))))
+         (list repo
+               (read-directory-name
+                "Destination: "
+                magit-clone-default-directory
+                name nil name))))))
   (magit-clone-regular
    (cond ((string-match-p "^[^/]+$" url-or-repo)
           (require 'ghub)
-          (format +magit-default-clone-url (ghub--username (ghub--host)) url-or-repo))
+          (bound! (#'ghub--username #'ghub--host)
+            (format +magit-default-clone-url (ghub--username (ghub--host)) url-or-repo)))
          ((string-match-p "^\\([^/]+\\)/\\([^/]+\\)/?$" url-or-repo)
           (apply #'format +magit-default-clone-url (split-string url-or-repo "/" t)))
          (url-or-repo))

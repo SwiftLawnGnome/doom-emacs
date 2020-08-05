@@ -6,7 +6,38 @@
   (require 'core-keybinds)
   (require 'core-projects))
 
-(defvar doom-detect-indentation-excluded-modes)
+(declare-function general-define-key "general")
+(declare-function easy-mmode-define-keymap "easy-mmode")
+(declare-function set-repl-handler! "settings")
+(declare-function +emacs-lisp/open-repl "autoload")
+(declare-function set-eval-handler! "settings")
+(declare-function +emacs-lisp-eval "autoload")
+(declare-function set-lookup-handlers! "lookup")
+(declare-function +emacs-lisp-lookup-definition "autoload")
+(declare-function +emacs-lisp-lookup-documentation "autoload")
+(declare-function set-docsets! "docsets")
+(declare-function set-pretty-symbols! "pretty-code")
+(declare-function set-rotate-patterns! "autoload")
+(declare-function +emacs-lisp-indent-function "autoload")
+(declare-function +emacs-lisp-init-straight-maybe-h "autoload")
+(declare-function +emacs-lisp-extend-imenu-h "autoload")
+(declare-function highlight-quoted-mode "highlight-quoted")
+(declare-function rainbow-delimiters-mode "rainbow-delimiters")
+(declare-function +emacs-lisp-reduce-flycheck-errors-in-emacs-config-h "autoload")
+(declare-function elisp-def "elisp-def")
+(declare-function doom-recenter-a "ui")
+(declare-function macrostep-expand "macrostep")
+(declare-function +emacs-lisp/edebug-instrument-defun-on "autoload")
+(declare-function +emacs-lisp/edebug-instrument-defun-off "autoload")
+(declare-function overseer-enable-mode "overseer")
+(declare-function doom-glob "files")
+(declare-function elisp-demos-advice-describe-function-1 "elisp-demos")
+(declare-function elisp-demos-advice-helpful-update "elisp-demos")
+
+(eval-when-compile
+  (autoload 'elisp-demos-advice-describe-function-1 "elisp-demos")
+  (autoload 'elisp-demos-advice-helpful-update "elisp-demos"))
+
 (defvar auto-minor-mode-alist)
 (defvar auto-minor-mode-magic-alist)
 
@@ -68,7 +99,9 @@ employed so that flycheck still does *some* helpful linting.")
 
   ;; variable-width indentation is superior in elisp. Otherwise, `dtrt-indent'
   ;; and `editorconfig' would force fixed indentation on elisp.
-  (add-to-list 'doom-detect-indentation-excluded-modes 'emacs-lisp-mode)
+  (require 'core-editor)
+  (bound! (doom-detect-indentation-excluded-modes)
+    (add-to-list 'doom-detect-indentation-excluded-modes 'emacs-lisp-mode))
 
   (add-hook! 'emacs-lisp-mode-hook
              ;; Allow folding of outlines in comments

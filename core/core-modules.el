@@ -2,6 +2,7 @@
 
 (require 'core)
 (require 'core-packages)
+(eval-when-compile (require 'inline))
 
 ;; feed the compiler
 (defvar use-package-compute-statistics)
@@ -301,7 +302,7 @@ those directories. The first returned path is always `doom-private-dir'."
                          (prependq! mplist (cddr m))))))
             ((catch 'doom-modules
                (let* ((module (if (listp m) (car m) m))
-                      (flags  (if (listp m) (cdr m))))
+                      (flags  (cdr-safe m)))
                  (when-let (new (assq module obsolete))
                    (let ((newkeys (cdr new)))
                      (if (null newkeys)
@@ -327,13 +328,13 @@ those directories. The first returned path is always `doom-private-dir'."
       (setq doom-inhibit-module-warnings t))
     (nreverse results)))
 
-(defun doom-module-list (&optional all-p)
+(define-inline doom-module-list (&optional all-p)
   "Minimally initialize `doom-modules' (a hash table) and return it.
 This value is cached. If REFRESH-P, then don't use the cached value."
-  (if all-p
-      (mapcar #'doom-module-from-path
-              (cdr (doom-module-load-path 'all)))
-    doom-modules))
+  (if (inline-const-val all-p)
+      (inline-quote (mapcar #'doom-module-from-path
+                            (cdr (doom-module-load-path 'all))))
+    (inline-quote doom-modules)))
 
 
 ;;
@@ -343,10 +344,7 @@ This value is cached. If REFRESH-P, then don't use the cached value."
 
 ;; (autoload 'use-package "use-package-core" nil nil t)
 
-(setq use-package-compute-statistics doom-debug-p
-      use-package-verbose doom-debug-p
-      use-package-minimum-reported-time (if doom-debug-p 0 0.1)
-      use-package-expand-minimally doom-interactive-p)
+
 
 ;; A common mistake for new users is that they inadvertantly install their
 ;; packages with package.el, by copying over old `use-package' declarations with
@@ -360,6 +358,11 @@ This value is cached. If REFRESH-P, then don't use the cached value."
     (setq use-package-ensure-function #'use-package-ensure-elpa)))
 
 (with-eval-after-load 'use-package-core
+  (setq use-package-compute-statistics doom-debug-p
+        use-package-verbose doom-debug-p
+        use-package-minimum-reported-time (if doom-debug-p 0 0.1)
+        use-package-expand-minimally doom-interactive-p)
+
   ;; `use-package' adds syntax highlighting for the `use-package' macro, but
   ;; Emacs 26+ already highlights macros, so it's redundant.
   (font-lock-remove-keywords 'emacs-lisp-mode use-package-font-lock-keywords)
@@ -453,9 +456,9 @@ This value is cached. If REFRESH-P, then don't use the cached value."
 ;;
 ;;; Module config macros
 
-(put :if     'lisp-indent-function 2)
-(put :when   'lisp-indent-function 'defun)
-(put :unless 'lisp-indent-function 'defun)
+;; (put :if     'lisp-indent-function 2)
+;; (put :when   'lisp-indent-function 'defun)
+;; (put :unless 'lisp-indent-function 'defun)
 
 (defmacro doom! (&rest modules)
   "Bootstraps DOOM Emacs and its modules.

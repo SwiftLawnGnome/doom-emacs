@@ -3,9 +3,23 @@
 ;;
 ;;; Library
 (declare-function buttercup-run "buttercup")
+(declare-function +eval-display-results "eval")
+(declare-function thing-at-point--beginning-of-sexp "thingatpt")
+(declare-function doom/help-modules "help")
+(declare-function elisp-def "elisp-def")
+(declare-function org-show-hidden-entry "org")
+(declare-function helpful-symbol "helpful")
+(declare-function helpful-at-point "helpful")
+(declare-function doom-path "files")
+(declare-function doom-project-root "projects")
+;; (declare-function buttercup-run-discover "buttercup")
+(declare-function ad-get-orig-definition "advice")
+
 (defvar calculate-lisp-indent-last-sexp)
+(defvar +emacs-lisp-disable-flycheck-in-dirs)
 (require 'core-vars)
 (require 'core-lib)
+(require 'core-modules)
 
 ;;;###autoload
 (defun +emacs-lisp-eval (beg end)
@@ -156,23 +170,26 @@ https://emacs.stackexchange.com/questions/10230/how-to-indent-keywords-aligned"
 (defun +emacs-lisp/buttercup-run-file ()
   "Run all buttercup tests in the focused buffer."
   (interactive)
-  (let ((load-path `(,(doom-path (dir!) "..")
-                      ,(or (doom-project-root) default-directory)
-                      ,@load-path)))
-    (save-selected-window
-      (eval-buffer)
-      (buttercup-run))
-    (message "File executed successfully")))
+  (require 'buttercup)
+  (bound! (#'buttercup-run)
+    (let ((load-path `(,(doom-path (dir!) "..")
+                        ,(or (doom-project-root) default-directory)
+                        ,@load-path)))
+      (save-selected-window
+        (eval-buffer)
+        (buttercup-run))
+      (message "File executed successfully"))))
 
 ;;;###autoload
 (defun +emacs-lisp/buttercup-run-project ()
   "Run all buttercup tests in the project."
   (interactive)
+  (require 'buttercup)
   (let* ((default-directory (doom-project-root))
          (load-path (append (list (doom-path "test")
                                   default-directory)
                             load-path)))
-    (buttercup-run-discover)))
+    (bound! (#'buttercup-run-discover) (buttercup-run-discover))))
 
 ;;;###autoload
 (defun +emacs-lisp/edebug-instrument-defun-on ()
@@ -222,6 +239,7 @@ https://emacs.stackexchange.com/questions/10230/how-to-indent-keywords-aligned"
   "Remove `emacs-lisp-checkdoc' checker and reduce `emacs-lisp' checker
 verbosity when editing a file in `doom-private-dir' or `doom-emacs-dir'."
   (when (and (bound-and-true-p flycheck-mode)
+             (boundp 'flycheck-disabled-checkers)
              (eq major-mode 'emacs-lisp-mode)
              (or (not default-directory)
                  (cl-find-if (doom-partial #'file-in-directory-p default-directory)
@@ -271,9 +289,9 @@ library/userland functions"
   (catch 'matcher
     (while (re-search-forward "\\(?:\\sw\\|\\s_\\)+" end t)
       (let ((ppss (save-excursion (syntax-ppss))))
-        (cond ((nth 3 ppss)  ; strings
+        (cond ((ppss-string-terminator ppss)  ; strings
                (search-forward "\"" end t))
-              ((nth 4 ppss)  ; comments
+              ((ppss-comment-depth ppss)  ; comments
                (forward-line +1))
               ((let ((symbol (intern-soft (match-string-no-properties 0))))
                  (and (cond ((null symbol) nil)
@@ -302,5 +320,5 @@ library/userland functions"
 ;;      `+emacs-lisp-highlight-vars-and-faces' and `+emacs-lisp-truncate-pin' to
 ;;      ensure they run as fast as possible:
 (dolist (fn '(+emacs-lisp-highlight-vars-and-faces +emacs-lisp-truncate-pin))
-  (unless (byte-code-function-p (symbol-function fn))
+  (when (consp (indirect-function fn))    ;; don't use `byte-code-function-p', it could be native-compiled
     (with-no-warnings (byte-compile fn))))

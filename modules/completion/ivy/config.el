@@ -1,5 +1,77 @@
 ;;; completion/ivy/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'use-package)
+  (require 'core-modules)
+  (require 'core-keybinds)
+  (require 'general))
+
+(require 'core-projects)
+
+(defvar projectile-completion-system)
+(defvar +ivy--origin)
+(defvar savehist-additional-variables)
+(defvar amx-save-file)
+
+(eval-when-compile
+  (declare-function ivy--regex-plus "ivy")
+  (declare-function ivy--regex-ignore-order "ivy")
+  (declare-function ivy-format-function-line "ivy")
+  (declare-function ivy--get-window "ivy")
+  (declare-function ivy-backward-kill-word "ivy")
+  (declare-function ivy-dispatching-done "ivy")
+  (declare-function hydra-ivy/body "ivy-hydra")
+  (declare-function ivy-configure "ivy")
+  (declare-function ivy-rich-mode "ivy-rich")
+  (declare-function counsel-apropos "counsel")
+  (declare-function counsel-bookmark "counsel")
+  (declare-function counsel-descbinds "counsel")
+  (declare-function counsel-faces "counsel")
+  (declare-function counsel-describe-function "counsel")
+  (declare-function counsel-describe-variable "counsel")
+  (declare-function counsel-evil-registers "counsel")
+  (declare-function counsel-mark-ring "counsel")
+  (declare-function counsel-M-x "counsel")
+  (declare-function counsel-find-file "counsel")
+  (declare-function counsel-find-library "counsel")
+  (declare-function counsel-imenu "counsel")
+  (declare-function counsel-info-lookup-symbol "counsel")
+  (declare-function counsel-load-theme "counsel")
+  (declare-function counsel-locate "counsel")
+  (declare-function counsel-org-goto "counsel")
+  (declare-function counsel-org-tag "counsel")
+  (declare-function counsel-recentf "counsel")
+  (declare-function counsel-set-variable "counsel")
+  (declare-function counsel-grep-or-swiper "counsel")
+  (declare-function counsel-unicode-char "counsel")
+  (declare-function counsel-yank-pop "counsel")
+  (declare-function ivy-add-actions "ivy")
+  (declare-function counsel-locate-cmd-mdfind "counsel")
+  (declare-function counsel--call "counsel")
+  (declare-function counsel-projectile-find-dir "counsel-projectile")
+  (declare-function counsel-projectile-switch-to-buffer "counsel-projectile")
+  (declare-function counsel-projectile-grep "counsel-projectile")
+  (declare-function counsel-projectile-ag "counsel-projectile")
+  (declare-function counsel-projectile-switch-project "counsel-projectile"))
+
+;; define-key!
+(declare-function +ivy/switch-buffer "ivy")
+(declare-function +ivy/switch-buffer-other-window "ivy")
+(declare-function +ivy/switch-workspace-buffer "ivy")
+(declare-function +ivy/jump-list "ivy")
+(declare-function better-jumper-set-jump "better-jumper")
+(declare-function +ivy--set-jump-point-maybe-h "config")
+(declare-function +ivy-yas-prompt-fn "ivy")
+(declare-function +ivy/woccur "ivy")
+(declare-function plist-put! "plist")
+(declare-function +ivy/compile "ivy")
+(declare-function +ivy/project-compile "ivy")
+(declare-function set-popup-rule! "settings")
+(declare-function helpful-callable "helpful")
+(declare-function helpful-variable "helpful")
+(declare-function +doom-dashboard-mode "config")
+(declare-function +ivy/projectile-find-file "ivy")
+
 (defvar +ivy-buffer-preview nil
   "If non-nil, preview buffers while switching, à la `counsel-switch-buffer'.
 
@@ -13,6 +85,8 @@ When 'everything, also preview virtual buffers")
 (defvar +ivy-edit-functions nil
   "A plist mapping ivy/counsel commands to commands that generate an editable
 results buffer.")
+
+
 
 
 ;;
@@ -54,7 +128,6 @@ results buffer.")
   (setq ivy-height 17
         ivy-wrap t
         ivy-fixed-height-minibuffer t
-        projectile-completion-system 'ivy
         ;; disable magic slash on non-match
         ivy-magic-slash-non-match-action nil
         ;; don't show recent files in switch-buffer
@@ -65,6 +138,9 @@ results buffer.")
         ivy-on-del-error-function #'ignore
         ;; enable ability to select prompt (alternative to `ivy-immediate-done')
         ivy-use-selectable-prompt t)
+
+  (with-eval-after-load 'projectile
+    (setq projectile-completion-system 'ivy))
 
   ;; Highlight each ivy candidate including the following newline, so that it
   ;; extends to the right edge of the window
@@ -98,10 +174,10 @@ evil-ex-specific constructs, so we disable it solely in evil-ex."
       (apply orig-fn args)))
 
   (define-key! ivy-minibuffer-map
-    [remap doom/delete-backward-word] #'ivy-backward-kill-word
-    "C-c C-e" #'+ivy/woccur
-    "C-o" #'ivy-dispatching-done
-    "M-o" #'hydra-ivy/body))
+               [remap doom/delete-backward-word] #'ivy-backward-kill-word
+               "C-c C-e" #'+ivy/woccur
+               "C-o" #'ivy-dispatching-done
+               "M-o" #'hydra-ivy/body))
 
 
 (use-package! ivy-rich
@@ -136,7 +212,8 @@ evil-ex-specific constructs, so we disable it solely in evil-ex."
 
   ;; Remove built-in coloring of buffer list; we do our own
   (setq ivy-switch-buffer-faces-alist nil)
-  (ivy-set-display-transformer 'internal-complete-buffer nil)
+  (ivy-configure 'internal-complete-buffer :display-transformer-fn nil)
+  ;; (ivy-set-display-transformer 'internal-complete-buffer nil)
 
   ;; Highlight buffers differently based on whether they're in the same project
   ;; as the current project or not.
@@ -323,7 +400,8 @@ evil-ex-specific constructs, so we disable it solely in evil-ex."
         #'+ivy/projectile-find-file)
 
   ;; no highlighting visited files; slows down the filtering
-  (ivy-set-display-transformer #'counsel-projectile-find-file nil)
+  (ivy-configure 'counsel-projectile-find-file :display-transformer-fn nil)
+  ;; (ivy-set-display-transformer #'counsel-projectile-find-file nil)
 
   (when (featurep! +prescient)
     (setq counsel-projectile-sort-files t)))
@@ -393,4 +471,5 @@ evil-ex-specific constructs, so we disable it solely in evil-ex."
 
 
 ;;;###package amx
-(setq amx-save-file (concat doom-cache-dir "amx-items"))  ; used by `counsel-M-x'
+(after! amx
+  (setq amx-save-file (concat doom-cache-dir "amx-items")))  ; used by `counsel-M-x'

@@ -475,12 +475,21 @@ elsewhere."
      ;; Some basic key validation; throws an error on invalid properties
      (condition-case e
          (when-let (recipe (plist-get plist :recipe))
-           (cl-destructuring-bind
-               (&key local-repo _files _flavor
-                     _no-build _no-byte-compile _no-autoloads
-                     _type _repo _host _branch _remote _nonrecursive _fork _depth
-                     _no-native-compile)
-               recipe
+           (let ((local-repo nil)
+                 (rp recipe)
+                 (ok-keys '(:type :repo :host :branch :remote :files
+                            :flavor :no-build :no-byte-compile :no-autoloads
+                            :nonrecursive :fork :depth :no-native-compile)))
+             (unless (plist-get recipe :allow-other-keys) ;mimic `cl-destructuring-bind'
+               (while rp
+                 (cond
+                   ((eq (car rp) :local-repo)
+                    (unless local-repo
+                      (setq local-repo (cadr local-repo))))
+                   ((memq (car rp) ok-keys) nil)
+                   (t (error "Keyword argument %s not one of %s"
+                             (car rp) (cons :local-repo ok-keys))))
+                 (setq rp (cddr rp))))
              ;; Expand :local-repo from current directory
              (when local-repo
                (plist-put!
@@ -492,7 +501,7 @@ elsewhere."
                                local-repo)))))))
        (error
         (signal 'doom-package-error
-                (cons ,(symbol-name name)
+                (list ,(symbol-name name)
                       (error-message-string e)))))
      ;; This is the only side-effect of this macro!
      (setf (alist-get name doom-packages) plist)
@@ -533,20 +542,19 @@ should use it!"
         (when target
           `(doom-package-set ',target :unpin t)))
       (cl-loop for target in targets
-               if (or (keywordp target) (listp target))
-               append
-               (cl-loop with (category . modules) = (doom-enlist target)
-                        for (name . plist) in doom-packages
-                        for pkg-modules = (plist-get plist :modules)
-                        if (and (assq category pkg-modules)
-                                (or (null modules)
-                                    (cl-loop for module in modules
-                                             if (member (cons category module) pkg-modules)
-                                             return t))
-                                name)
-                        collect it)
-               else if (symbolp target)
-               collect target)))))
+         if (or (keywordp target) (listp target))
+         nconc
+          (cl-loop with (category . modules) = (doom-enlist target)
+             for (name . plist) in doom-packages
+             for pkg-modules = (plist-get plist :modules)
+             if (and name
+                     (assq category pkg-modules)
+                     (or (null modules)
+                         (cl-loop for module in modules
+                            thereis (member (cons category module) pkg-modules))))
+             collect name)
+         else if (symbolp target)
+         collect target)))))
 
 (provide 'core-packages)
 ;;; core-packages.el ends here

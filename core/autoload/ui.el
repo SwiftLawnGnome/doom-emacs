@@ -2,6 +2,8 @@
 
 ;;
 ;;; Public library
+(require 'core-lib)
+(declare-function doom-real-buffer-list "buffers")
 
 ;;;###autoload
 (defun doom-resize-window (window new-size &optional horizontal force-p)
@@ -34,12 +36,13 @@ are open."
 ;;;###autoload
 (defun doom-preserve-window-position-a (orig-fn &rest args)
   "Generic advice for preserving cursor position on screen after scrolling."
-  (let ((row (cdr (posn-col-row (posn-at-point)))))
-    (prog1 (apply orig-fn args)
-      (save-excursion
-        (let ((target-row (- (line-number-at-pos) row)))
-          (unless (< target-row 0)
-            (evil-scroll-line-to-top target-row)))))))
+  (when (fboundp 'evil-scroll-line-to-top)
+    (let ((row (cdr (posn-col-row (posn-at-point)))))
+      (prog1 (apply orig-fn args)
+        (save-excursion
+          (let ((target-row (- (line-number-at-pos) row)))
+            (unless (< target-row 0)
+              (evil-scroll-line-to-top target-row))))))))
 
 ;;;###autoload
 (defun doom-shut-up-a (orig-fn &rest args)
@@ -59,8 +62,10 @@ In tty Emacs, messages suppressed completely."
 (defun doom-apply-ansi-color-to-compilation-buffer-h ()
   "Applies ansi codes to the compilation buffers. Meant for
 `compilation-filter-hook'."
+  (require 'ansi-color-apply-on-region)
   (with-silent-modifications
-    (ansi-color-apply-on-region compilation-filter-start (point))))
+    (bound! (#'ansi-color-apply-on-region compilation-filter-start)
+      (ansi-color-apply-on-region compilation-filter-start (point)))))
 
 ;;;###autoload
 (defun doom-disable-show-paren-mode-h ()
@@ -89,20 +94,22 @@ visual-line-mode is on, this skips relative and uses visual instead.
 
 See `display-line-numbers' for what these values mean."
   (interactive)
-  (defvar doom--line-number-style display-line-numbers-type)
-  (let* ((styles `(t ,(if visual-line-mode 'visual 'relative) nil))
-         (order (cons display-line-numbers-type (remq display-line-numbers-type styles)))
-         (queue (memq doom--line-number-style order))
-         (next (if (= (length queue) 1)
-                   (car order)
-                 (car (cdr queue)))))
-    (setq doom--line-number-style next)
-    (setq display-line-numbers next)
-    (message "Switched to %s line numbers"
-             (pcase next
-               (`t "normal")
-               (`nil "disabled")
-               (_ (symbol-name next))))))
+  (bound! (display-line-numbers-type)
+    ;; wtf??
+    (defvar doom--line-number-style display-line-numbers-type)
+    (let* ((styles `(t ,(if visual-line-mode 'visual 'relative) nil))
+           (order (cons display-line-numbers-type (delq display-line-numbers-type styles)))
+           (queue (memq doom--line-number-style order))
+           (next (if (= (length queue) 1)
+                     (car order)
+                   (car (cdr queue)))))
+      (setq doom--line-number-style next)
+      (setq display-line-numbers next)
+      (message "Switched to %s line numbers"
+               (pcase next
+                 (`t "normal")
+                 (`nil "disabled")
+                 (_ (symbol-name next)))))))
 
 ;;;###autoload
 (defun doom/delete-frame-with-prompt ()
@@ -122,10 +129,11 @@ window changes before then, the undo expires.
 Alternatively, use `doom/window-enlargen'."
   (interactive)
   (setq doom--maximize-last-wconf
-        (if (and (null (cdr (cl-remove-if #'window-dedicated-p (window-list))))
+        (if (and (null (cdr (doom-remove #'window-dedicated-p (window-list))))
                  doom--maximize-last-wconf)
             (ignore (set-window-configuration doom--maximize-last-wconf))
           (when (and (bound-and-true-p +popup-mode)
+                     (fboundp '+popup-window-p)
                      (+popup-window-p))
             (user-error "Cannot maximize a popup, use `+popup/raise' first or use `doom/window-enlargen' instead"))
           (prog1 (current-window-configuration)

@@ -1,5 +1,27 @@
 ;;; lang/org/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-keybinds)
+  (require 'core-lib)
+  (require 'core-modules)
+  (require 'use-package))
+
+(defvar org-indirect-buffer-display)
+(defvar org-eldoc-breadcrumb-separator)
+(defvar org-enforce-todo-dependencies)
+(defvar org-entities-user)
+(defvar org-fontify-done-headline)
+(defvar org-fontify-quote-and-verse-blocks)
+(defvar org-fontify-whole-heading-line)
+(defvar org-footnote-auto-label)
+(defvar org-hide-leading-stars)
+(defvar org-image-actual-width)
+(defvar org-imenu-depth)
+(defvar org-priority-faces)
+(defvar org-startup-indented)
+(defvar org-tags-column)
+(defvar org-use-sub-superscripts)
+
 (defvar +org-babel-mode-alist
   '((cpp . C)
     (C++ . C)
@@ -65,14 +87,18 @@ Is relative to `org-directory', unless it is absolute. Is used in Doom's default
 ;;; `org-load' hooks
 
 (defun +org-init-org-directory-h ()
-  (unless org-directory
-    (setq org-directory "~/org"))
-  (setq org-id-locations-file (expand-file-name ".orgids" org-directory)))
+  (bound! (org-directory)
+    (unless org-directory
+      (setq org-directory "~/org"))
+    (require 'org-id)
+    (bound! (org-id-locations-file)
+      (setq org-id-locations-file (expand-file-name ".orgids" org-directory)))))
 
 
 (defun +org-init-agenda-h ()
-  (unless org-agenda-files
-    (setq org-agenda-files (list org-directory)))
+  (bound! (org-agenda-files org-directory)
+    (unless org-agenda-files
+      (setq org-agenda-files (list org-directory))))
   (setq-default
    org-agenda-deadline-faces
    '((1.001 . error)
@@ -219,14 +245,15 @@ This forces it to read the background before rendering."
   ;; ipython, where the result could be an image)
   (add-hook 'org-babel-after-execute-hook #'org-redisplay-inline-images)
 
-  (after! python
-    (setq org-babel-python-command python-shell-interpreter)))
+  (after! (:and python ob-python)
+    (bound! (org-babel-python-command python-shell-interpreter)
+      (setq org-babel-python-command python-shell-interpreter))))
 
 
 (defun +org-init-babel-lazy-loader-h ()
   "Load babel libraries lazily when babel blocks are executed."
   (defun +org--babel-lazy-load (lang &optional async)
-    (cl-check-type lang (or symbol null))
+    (cl-check-type lang symbol)
     (unless (cdr (assq lang org-babel-load-languages))
       (when async
         ;; ob-async has its own agenda for lazy loading packages (in the child
@@ -559,7 +586,7 @@ eldoc string."
       "Prevent temporarily-opened agenda buffers from being associated with the
 current workspace (and clean them up)."
       (when (and org-agenda-new-buffers (bound-and-true-p persp-mode))
-        (unless org-agenda-sticky
+        (unless (bound-and-true-p org-agenda-sticky)
           (let (persp-autokill-buffer-on-remove)
             (persp-remove-buffer org-agenda-new-buffers
                                  (get-current-persp)
@@ -911,7 +938,6 @@ compelling reason, so..."
 (use-package! org-clock ; built-in
   :commands org-clock-save
   :init
-  (setq org-clock-persist-file (concat doom-etc-dir "org-clock-save.el"))
   (defadvice! +org--clock-load-a (&rest _)
     "Lazy load org-clock until its commands are used."
     :before '(org-clock-in
@@ -921,6 +947,7 @@ compelling reason, so..."
               org-clock-cancel)
     (org-clock-load))
   :config
+  (setq org-clock-persist-file (concat doom-etc-dir "org-clock-save.el"))
   (setq org-clock-persist 'history
         ;; Resume when clocking into task with open clock
         org-clock-in-resume t)

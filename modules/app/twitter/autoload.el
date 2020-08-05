@@ -1,7 +1,28 @@
 ;;; app/twitter/autoload.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-modules))
+
+(eval-and-compile
+  (require 'avy))
+
+(defvar twittering-initial-timeline-spec-string)
+(defvar +twitter/ace-link)
+(defvar avy-style)
+(declare-function twittering-ensure-whole-of-status-is-visible "twittering-mode")
+(declare-function twittering-goto-next-thing "twittering-mode")
+(declare-function doom-fallback-buffer "buffers")
+(declare-function twit "twittering-mode")
+(declare-function twittering-kill-buffer "twittering-mode")
+(declare-function doom-buffers-in-mode "buffers")
+(declare-function twittering-rerender-timeline-all "twittering-mode")
+(declare-function avy--process "avy")
+(declare-function avy--style-fn "avy")
+
 (defvar +twitter-workspace-name "*Twitter*"
   "The name to use for the twitter workspace.")
+
+
 
 ;;;###autoload
 (defun +twitter-display-buffer-fn (buf)
@@ -27,7 +48,7 @@ that works with the feature/popup module."
 (defun =twitter (arg)
   "Opens a workspace dedicated to `twittering-mode'."
   (interactive "P")
-  (condition-case _
+  (condition-case nil
       (progn
         (if (and (not arg) (featurep! :ui workspaces))
             (+workspace/new +twitter-workspace-name)
@@ -43,7 +64,7 @@ that works with the feature/popup module."
           (switch-to-buffer name))
         (balance-windows)
         (call-interactively #'+twitter/rerender-all))
-    ('error (+twitter/quit-all))))
+    (error (+twitter/quit-all))))
 
 ;;;###autoload
 (defun +twitter/quit ()
@@ -85,7 +106,7 @@ that works with the feature/popup module."
   (require 'avy)
   ;; REVIEW Is this necessary anymore with `link-hint'
   (let ((pt (avy-with +twitter/ace-link
-              (avy--process
+              (avy-process
                (+twitter--collect-links)
                (avy--style-fn avy-style)))))
     (when (number-or-marker-p pt)

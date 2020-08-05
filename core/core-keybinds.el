@@ -104,7 +104,9 @@ all hooks after it are ignored.")
   :config
   ;; Convenience aliases
   (defalias 'define-key! #'general-def)
-  (defalias 'undefine-key! #'general-unbind))
+  (defalias 'undefine-key! #'general-unbind)
+  (put 'define-key! 'lisp-indent-function 0)
+  (put 'undefine-key! 'lisp-indent-function 0))
 
 
 ;; HACK `map!' uses this instead of `define-leader-key!' because it consumes
@@ -230,28 +232,26 @@ localleader prefix."
 ;;
 ;;; Packages
 
-(eval-when-compile
-  (autoload 'which-key-prefix-then-key-order "which-key")
-  (autoload 'which-key-setup-side-window-bottom "which-key")
-  (autoload 'which-key-add-key-based-replacements "which-key"))
-
 (use-package! which-key
   :hook (doom-first-input . which-key-mode)
   :init
   :config
-  (setq which-key-sort-order #'which-key-prefix-then-key-order
-        which-key-sort-uppercase-first nil
+  (bound! (#'which-key-prefix-then-key-order)
+    (setq which-key-sort-order #'which-key-prefix-then-key-order))
+  (setq which-key-sort-uppercase-first nil
         which-key-add-column-padding 1
         which-key-max-display-columns nil
         which-key-min-display-lines 6
         which-key-side-window-slot -10)
   ;; general improvements to which-key readability
   (set-face-attribute 'which-key-local-map-description-face nil :weight 'bold)
-  (which-key-setup-side-window-bottom)
+  (bound! (#'which-key-setup-side-window-bottom)
+    (which-key-setup-side-window-bottom))
   (setq-hook! 'which-key-init-buffer-hook line-spacing 3)
 
-  (which-key-add-key-based-replacements doom-leader-key "<leader>")
-  (which-key-add-key-based-replacements doom-localleader-key "<localleader>"))
+  (bound! (#'which-key-add-key-based-replacements)
+    (which-key-add-key-based-replacements doom-leader-key "<leader>")
+    (which-key-add-key-based-replacements doom-localleader-key "<localleader>")))
 
 
 ;;

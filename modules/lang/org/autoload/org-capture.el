@@ -59,7 +59,7 @@ you're done. This can be called from an external shell script."
               (when (and key (not (string-empty-p key)))
                 (setq org-capture-entry (org-capture-select-template key)))
               (funcall +org-capture-fn)))
-        ('error
+        (error
          (message "org-capture: %s" (error-message-string ex))
          (delete-frame frame))))))
 
