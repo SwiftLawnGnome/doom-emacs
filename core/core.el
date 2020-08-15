@@ -1,6 +1,7 @@
 ;;; core.el --- the heart of the beast -*- lexical-binding: t; -*-
 
 (require 'core-vars)
+(declare-function doom-try-run-hook "core-lib")
 
 (eval-when-compile
   (when (< emacs-major-version 27)
@@ -482,7 +483,7 @@ to least)."
     ;; like `doom-modules', `doom-disabled-packages', `load-path',
     ;; `auto-mode-alist', and `Info-directory-list'. etc. Compiling them into
     ;; one place is a big reduction in startup time.
-    (condition-case nil
+    (condition-case e
         ;; Avoid `file-name-sans-extension' for premature optimization reasons.
         ;; `string-remove-suffix' is cheaper because it performs no file sanity
         ;; checks; just plain ol' string manipulation.
@@ -497,7 +498,8 @@ to least)."
                          "run 'bin/doom sync' on the command line to repair it"))
          ;; Otherwise, something inside the autoloads file is triggering this
          ;; error; forward it!
-         (apply #'doom-autoload-error e))))
+         (signal 'doom-autoload-error
+                 (cons doom-autoload-file e)))))
 
     ;; Load shell environment, optionally generated from 'doom env'. No need
     ;; to do so if we're in terminal Emacs, where Emacs correctly inherits
@@ -526,26 +528,29 @@ to least)."
       (add-hook 'doom-first-input-hook #'gcmh-mode)
       (letrec ((run-input-hook
                 (lambda (&rest _)
-                  (run-hooks 'doom-first-input-hook)
+                  (run-hook-wrapped 'doom-first-input-hook #'doom-try-run-hook)
                   (setq doom-first-input-hook nil)
                   (remove-hook 'doom-first-input-hook run-input-hook))))
+        (put 'doom-first-input-hook 'permanent-local t)
         (add-hook 'pre-command-hook run-input-hook))
       ;; (add-hook-trigger! 'doom-first-input-hook 'pre-command-hook)
       (letrec ((run-file-hook
                 (lambda (&rest _)
-                  (run-hooks 'doom-first-file-hook)
+                  (run-hook-wrapped 'doom-first-file-hook #'doom-try-run-hook)
                   (setq doom-first-file-hook nil)
                   (remove-hook 'dired-initial-position-hook run-file-hook)
                   (advice-remove 'after-find-file run-file-hook))))
+        (put 'doom-first-file-hook 'permanent-local t)
         (add-hook 'dired-initial-position-hook run-file-hook)
         (advice-add 'after-find-file :before run-file-hook))
       ;; (add-hook-trigger! 'doom-first-file-hook 'after-find-file 'dired-initial-position-hook)
       (letrec ((run-buffer-hook
                 (lambda (&rest _)
-                  (run-hooks 'doom-first-buffer-hook)
+                  (run-hook-wrapped 'doom-first-buffer-hook #'doom-try-run-hook)
                   (setq doom-first-buffer-hook nil)
                   (remove-hook 'doom-switch-buffer-hook run-buffer-hook)
                   (advice-remove 'after-find-file run-buffer-hook))))
+        (put 'doom-first-buffer-hook 'permanent-local t)
         (add-hook 'doom-switch-buffer-hook run-buffer-hook)
         (advice-add 'after-find-file :before run-buffer-hook))
       ;; (add-hook-trigger! 'doom-first-buffer-hook 'after-find-file 'doom-switch-buffer-hook)

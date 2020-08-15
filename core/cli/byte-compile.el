@@ -2,6 +2,11 @@
 
 (require 'core-vars)
 (require 'core-lib)
+(eval-when-compile (require 'core-cli-lib))
+(require 'core-output)
+(require 'core-modules)
+(eval-and-compile (require 'core-output))
+
 (defvar use-package-compute-statistics)
 (defvar use-package-defaults)
 (defvar use-package-expand-minimally)
@@ -172,7 +177,7 @@ If RECOMPILE-P is non-nil, only recompile out-of-date files."
                      total-ok total-files
                      total-noop)
              (= total-fail 0))
-         ((debug error)
+         (error
           (print! (error "There were breaking errors.\n\n%s")
                   "Reverting changes...")
           (signal 'doom-error (list 'byte-compile e))))))))
@@ -180,7 +185,6 @@ If RECOMPILE-P is non-nil, only recompile out-of-date files."
 (defun doom-clean-byte-compiled-files ()
   "Delete all the compiled elc files in your Emacs configuration and private
 module. This does not include your byte-compiled, third party packages.'"
-  (require 'core-modules)
   (print! (start "Cleaning .elc files"))
   (print-group!
    (cl-loop with default-directory = doom-emacs-dir

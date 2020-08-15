@@ -310,7 +310,9 @@ library/userland functions"
                                                    (setq unaliased (indirect-function unadvised)))))
                                    unaliased)
                                  (setq +emacs-lisp--face
-                                       (if (subrp unaliased)
+                                       (if (and (subrp unaliased)
+                                                (or (eval-when-compile (not (fboundp 'subr-native-elisp-p)))
+                                                    (not (subr-native-elisp-p unaliased))))
                                            'font-lock-constant-face
                                          'font-lock-function-name-face))))))
                       (throw 'matcher t)))))))
@@ -320,5 +322,10 @@ library/userland functions"
 ;;      `+emacs-lisp-highlight-vars-and-faces' and `+emacs-lisp-truncate-pin' to
 ;;      ensure they run as fast as possible:
 (dolist (fn '(+emacs-lisp-highlight-vars-and-faces +emacs-lisp-truncate-pin))
-  (when (consp (indirect-function fn))    ;; don't use `byte-code-function-p', it could be native-compiled
-    (with-no-warnings (byte-compile fn))))
+  (when (consp (indirect-function fn)) ;; don't use `byte-code-function-p', it could be native-compiled
+    (with-no-warnings
+      (or (and (fboundp 'native-compile)
+               (fboundp 'native-comp-available-p)
+               (native-comp-available-p)
+               (ignore-errors (native-compile fn)))
+          (byte-compile fn)))))

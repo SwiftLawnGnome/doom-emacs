@@ -13,6 +13,23 @@
 (defvar whitespace-mode)
 (defvar image-animate-loop)
 (defvar rainbow-delimiters-max-face-count)
+(defvar comint-prompt-read-only)
+(defvar compilation-always-kill)
+(defvar compilation-scroll-output)
+(defvar ediff-diff-options)
+(defvar ediff-split-window-function)
+(defvar ediff-window-setup-function)
+(declare-function doom-real-buffer-list "buffers")
+(declare-function doom-visible-buffers "buffers")
+(declare-function doom/delete-frame-with-prompt "ui")
+(declare-function doom-apply-ansi-color-to-compilation-buffer-h "ui")
+(declare-function ediff-setup-windows-plain "ediff")
+(declare-function doom-ediff-save-wconf-h "core-ui")
+(declare-function doom-ediff-restore-wconf-h "core-ui")
+(declare-function doom-disable-hl-line-h "core-ui")
+(declare-function doom-enable-hl-line-maybe-h "core-ui")
+(declare-function hide-mode-line-mode "hide-mode-line")
+(declare-function doom-disable-whitespace-mode-in-childframes-a "core-ui")
 
 ;;
 ;;; Variables
@@ -404,8 +421,9 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
 ;;
 ;;; Built-in packages
 
-;;;###package ansi-color
-(setq ansi-color-for-comint-mode t)
+;; ;;;###package ansi-color
+;; this is the default
+;; (setq ansi-color-for-comint-mode t)
 
 
 (after! comint
@@ -417,7 +435,8 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
         compilation-ask-about-save nil  ; save all buffers on `compile'
         compilation-scroll-output 'first-error)
   ;; Handle ansi codes in compilation buffer
-  (add-hook 'compilation-filter-hook #'doom-apply-ansi-color-to-compilation-buffer-h))
+  (add-hook 'compilation-filter-hook
+            #'doom-apply-ansi-color-to-compilation-buffer-h))
 
 
 (after! ediff
@@ -483,7 +502,7 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
 
 
 ;;;###package whitespace
-(with-eval-after-load 'whitespace
+(after! whitespace
   (defvar whitespace-line-column)
   (defvar whitespace-style)
   (defvar whitespace-display-mappings)
@@ -543,13 +562,13 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
   :config (setq highlight-numbers-generic-regexp "\\_<[[:digit:]]+\\(?:\\.[0-9]*\\)?\\_>"))
 
 ;;;###package image
-(with-eval-after-load 'image-mode
+(after! image-mode
   (setq image-animate-loop t))
 
 ;;;###package rainbow-delimiters
 ;; Helps us distinguish stacked delimiter pairs, especially in parentheses-drunk
 ;; languages like Lisp.
-(with-eval-after-load 'rainbow-delimiters
+(after! rainbow-delimiters
   (setq rainbow-delimiters-max-face-count 6))
 
 
@@ -742,7 +761,8 @@ This offers a moderate boost in startup (or theme switch) time, so long as
 disable it to fix all that visual noise."
     (unless (frame-parameter nil 'parent-frame)
       (funcall orig-fn)))
-  (add-function :around whitespace-enable-predicate #'doom-disable-whitespace-mode-in-childframes-a))
+  (add-function :around whitespace-enable-predicate
+                #'doom-disable-whitespace-mode-in-childframes-a))
 
 ;; Don't display messages in the minibuffer when using the minibuffer
 (defmacro doom-silence-motion-key (command key)

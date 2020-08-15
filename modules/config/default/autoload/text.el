@@ -1,5 +1,10 @@
 ;;; config/default/autoload/text.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-modules))
+
+(declare-function doom-point-in-string-p "text")
+
 ;;;###autoload
 (defalias '+default/newline #'newline)
 
@@ -7,8 +12,9 @@
 (defun +default/newline-above ()
   "Insert an indented new line before the current one."
   (interactive)
-  (if (featurep 'evil)
-      (call-interactively 'evil-open-above)
+  (if (and (featurep 'evil)
+           (fboundp 'evil-open-above))
+      (call-interactively #'evil-open-above)
     (beginning-of-line)
     (save-excursion (newline))
     (indent-according-to-mode)))
@@ -17,8 +23,9 @@
 (defun +default/newline-below ()
   "Insert an indented new line after the current one."
   (interactive)
-  (if (featurep 'evil)
-      (call-interactively 'evil-open-below)
+  (if (and (featurep 'evil)
+           (fboundp 'evil-open-below))
+      (call-interactively #'evil-open-below)
     (end-of-line)
     (newline-and-indent)))
 
@@ -55,37 +62,38 @@ If `buffer-file-name' isn't set, uses `default-directory'."
   "Delete back to the previous column of whitespace, or as much whitespace as
 possible, or just one char if that's not possible."
   (interactive)
-  (let* ((context (ignore-errors (sp-get-thing)))
+  (let* ((context (ignore-errors (and (fboundp 'sp-get-thing) (sp-get-thing))))
          (op (plist-get context :op))
          (cl (plist-get context :cl))
          open-len close-len)
-    (cond ;; When in strings (sp acts weird with quotes; this is the fix)
-          ;; Also, skip closing delimiters
-          ((and op cl
-                (string= op cl)
-                (and (string= (char-to-string (or (char-before) 0)) op)
-                     (setq open-len (length op)))
-                (and (string= (char-to-string (or (char-after) 0)) cl)
-                     (setq close-len (length cl))))
-           (delete-char (- open-len))
-           (delete-char close-len))
+    (cond
+      ;; When in strings (sp acts weird with quotes; this is the fix)
+      ;; Also, skip closing delimiters
+      ((and op cl
+            (string= op cl)
+            (string= (char-to-string (preceding-char)) op)
+            (setq open-len (length op))
+            (string= (char-to-string (following-char)) cl)
+            (setq close-len (length cl)))
+       (delete-char (- open-len))
+       (delete-char close-len))
 
-          ;; Delete up to the nearest tab column IF only whitespace between
-          ;; point and bol.
-          ((and (not indent-tabs-mode)
-                (> tab-width 1)
-                (not (bolp))
-                (not (doom-point-in-string-p))
-                (save-excursion (>= (- (skip-chars-backward " \t")) tab-width)))
-           (let ((movement (% (current-column) tab-width)))
-             (when (= movement 0)
-               (setq movement tab-width))
-             (delete-char (- movement)))
-           (unless (memq (char-before) (list ?\n ?\ ))
-             (insert " ")))
+      ;; Delete up to the nearest tab column IF only whitespace between
+      ;; point and bol.
+      ((and (not indent-tabs-mode)
+            (> tab-width 1)
+            (not (bolp))
+            (not (doom-point-in-string-p))
+            (save-excursion (>= (- (skip-chars-backward " \t")) tab-width)))
+       (let ((movement (% (current-column) tab-width)))
+         (when (= movement 0)
+           (setq movement tab-width))
+         (delete-char (- movement)))
+       (unless (memq (char-before) (list ?\n ?\ ))
+         (insert " ")))
 
-          ;; Otherwise do a regular delete
-          ((delete-char -1)))))
+      ;; Otherwise do a regular delete
+      ((delete-char -1)))))
 
 ;;;###autoload
 (defun +default--delete-backward-char-a (n &optional killflag)
@@ -120,16 +128,15 @@ possible, or just one char if that's not possible."
            (delete-char (- n) killflag)
            (save-excursion
              (insert-char ?\s (- ocol (current-column)) nil))))
-        ;;
         ((= n 1)
          (cond ((or (not (featurep! +smartparens))
                     (not (bound-and-true-p smartparens-mode))
-                    (and (memq (char-before) (list ?\  ?\t))
+                    (and (memq (char-before) '(?\s ?\t))
                          (save-excursion
                            (and (/= (skip-chars-backward " \t" (line-beginning-position)) 0)
                                 (bolp)))))
                 (doom/backward-delete-whitespace-to-column))
-               ((let* ((pair (ignore-errors (sp-get-thing)))
+               ((let* ((pair (ignore-errors (and (fboundp 'sp-get-thing) (sp-get-thing))))
                        (op   (plist-get pair :op))
                        (cl   (plist-get pair :cl))
                        (beg  (plist-get pair :beg))

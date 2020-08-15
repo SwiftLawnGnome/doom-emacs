@@ -1,6 +1,10 @@
 ;;; core/autoload/help.el -*- lexical-binding: t; -*-
 
 (require 'core-vars)
+(require 'core-lib)
+
+(defvar org-inhibit-startup)
+(defvar org-link-any-re)
 
 (defvar doom--help-major-mode-module-alist
   '((dockerfile-mode :tools docker)
@@ -146,8 +150,9 @@ selection of all minor-modes, active or not."
                         (buffer-file-name)
                         (point))))))
           t 'agenda))
-      (mapc #'kill-buffer org-agenda-new-buffers)
-      (setq org-agenda-new-buffers nil))))
+      (when (boundp 'org-agenda-new-buffers)
+        (mapc #'kill-buffer org-agenda-new-buffers)
+        (setq org-agenda-new-buffers nil)))))
 
 (defvar ivy-sort-functions-alist)
 ;;;###autoload
@@ -433,11 +438,14 @@ If prefix arg is present, refresh the cache."
      (require 'package)
      (require 'straight)
      (let ((packages (delete-dups
-                      (append (mapcar #'car package-alist)
-                              (mapcar #'car package--builtins)
-                              (mapcar #'intern (hash-table-keys straight--build-cache))
-                              (mapcar #'car (doom-package-list 'all))
-                              nil))))
+                      (nconc (mapcar #'car package-alist)
+                             (mapcar #'car package--builtins)
+                             (when (boundp 'straight--build-cache)
+                               (cl-loop
+                                  for key being the hash-keys
+                                  of straight--build-cache
+                                  collect (intern key)))
+                             (mapcar #'car (doom-package-list 'all))))))
        (unless (memq guess packages)
          (setq guess nil))
        (list
@@ -504,7 +512,8 @@ If prefix arg is present, refresh the cache."
 
         (when-let
             (modules
-             (if (gethash (symbol-name package) straight--build-cache)
+             (if (and (boundp 'straight--build-cache)
+                      (gethash (symbol-name package) straight--build-cache))
                  (doom-package-get package :modules)
                (plist-get (cdr (assq package (doom-package-list 'all)))
                           :modules)))
@@ -651,7 +660,7 @@ config blocks in your private config."
 Uses the symbol at point or the current selection, if available."
   (interactive
    (list (doom--help-search-prompt "Search load-path: ")))
-  (doom--help-search (cl-remove-if-not #'file-directory-p load-path)
+  (doom--help-search (doom-keep #'file-directory-p load-path)
                      query "Search load-path: "))
 
 ;;;###autoload

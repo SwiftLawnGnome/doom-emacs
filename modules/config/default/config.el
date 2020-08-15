@@ -1,5 +1,8 @@
 ;;; config/default/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-lib))
+
 (defvar +default-want-RET-continue-comments t
   "If non-nil, RET will continue commented lines.")
 

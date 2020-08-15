@@ -66,6 +66,7 @@ Detects evil visual mode as well."
   (declare (side-effect-free t))
   (or (use-region-p)
       (and (bound-and-true-p evil-local-mode)
+           (fboundp 'evil-visual-state-p)
            (evil-visual-state-p))))
 
 ;;;###autoload
@@ -73,9 +74,9 @@ Detects evil visual mode as well."
   "Return beginning position of selection.
 Uses `evil-visual-beginning' if available."
   (declare (side-effect-free t))
-  (if (bound-and-true-p evil-local-mode)
-      evil-visual-beginning
-    (region-beginning)))
+  (or (and (bound-and-true-p evil-local-mode)
+           (bound-and-true-p evil-visual-beginning))
+      (region-beginning)))
 
 ;;;###autoload
 (defun doom-region-end ()
@@ -129,14 +130,14 @@ in some cases."
                     (save-excursion
                       (beginning-of-visual-line)
                       (point))
-                  (line-beginning-position)))
+                  (point-at-bol)))
            (bot (save-excursion
                   (goto-char bol)
                   (skip-chars-forward " \t\r")
                   (point)))
            (eol (if visual-line-mode
                     (save-excursion (end-of-visual-line) (point))
-                  (line-end-position)))
+                  (point-at-eol)))
            (eot (or (save-excursion
                       (if (not comment-use-syntax)
                           (progn
@@ -144,11 +145,10 @@ in some cases."
                             (when (re-search-forward comment-start-skip eol t)
                               (or (match-end 1) (match-beginning 0))))
                         (goto-char eol)
-                        (while (and (doom-point-in-comment-p)
-                                    (> (point) bol))
-                          (backward-char))
+                        (skip-syntax-backward "^<" bol)
+                        (skip-syntax-backward "<" bol)
                         (skip-chars-backward " " bol)
-                        (unless (or (eq (char-after) 32) (eolp))
+                        (unless (or (eq (char-after) ?\s) (eolp))
                           (forward-char))
                         (point)))
                     eol)))
@@ -202,10 +202,9 @@ line to beginning of line. Same as `evil-delete-back-to-indentation'."
   (interactive)
   (let ((empty-line-p (save-excursion (beginning-of-line)
                                       (looking-at-p "[ \t]*$"))))
-    (funcall (if (fboundp 'evil-delete)
-                 #'evil-delete
-               #'delete-region)
-             (point-at-bol) (point))
+    (if (fboundp 'evil-delete)
+        (evil-delete (point-at-bol) (point))
+      (delete-region (point-at-bol) (point)))
     (unless empty-line-p
       (indent-according-to-mode))))
 
@@ -223,24 +222,21 @@ line to beginning of line. Same as `evil-delete-back-to-indentation'."
   (if indent-tabs-mode
       (insert "\t")
     (let* ((movement (% (current-column) tab-width))
-           (spaces (if (= 0 movement) tab-width (- tab-width movement))))
-      (insert (make-string spaces ? )))))
+           (spaces (- tab-width movement)))
+      (insert-char ?\s spaces))))
 
 ;;;###autoload
 (defun doom/dumb-dedent ()
   "Dedents the current line."
   (interactive)
-  (if indent-tabs-mode
-      (call-interactively #'backward-delete-char)
-    (unless (bolp)
-      (save-excursion
-        (when (> (current-column) (current-indentation))
-          (back-to-indentation))
-        (let ((movement (% (current-column) tab-width)))
-          (delete-char
-           (- (if (= 0 movement)
-                  tab-width
-                (- tab-width movement)))))))))
+  (cond
+    (indent-tabs-mode (call-interactively #'backward-delete-char))
+    ((bolp) nil)
+    (t (save-excursion
+         (when (> (current-column) (current-indentation))
+           (back-to-indentation))
+         (let ((movement (% (current-column) tab-width)))
+           (delete-char (- (- tab-width movement))))))))
 
 ;;;###autoload
 (defun doom/retab (arg &optional beg end)
@@ -306,7 +302,8 @@ editorconfig or dtrt-indent installed."
   (cond ((require 'editorconfig nil t)
          (let (editorconfig-lisp-use-default-indent)
            (editorconfig-set-indentation nil width)))
-        ((require 'dtrt-indent nil t)
+        ((and (require 'dtrt-indent nil t)
+              (boundp 'dtrt-indent-hook-mapping-list))
          (when-let (var (nth 2 (assq major-mode dtrt-indent-hook-mapping-list)))
            (doom-log "Updated %s = %d" var width)
            (set var width))))

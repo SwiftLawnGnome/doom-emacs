@@ -5,6 +5,7 @@
   (require 'core-lib)
   (require 'core-modules)
   (require 'use-package))
+(require 'core-editor)
 
 (defvar org-indirect-buffer-display)
 (defvar org-eldoc-breadcrumb-separator)
@@ -21,6 +22,7 @@
 (defvar org-startup-indented)
 (defvar org-tags-column)
 (defvar org-use-sub-superscripts)
+(defvar org-babel-load-languages)
 
 (defvar +org-babel-mode-alist
   '((cpp . C)
@@ -289,7 +291,7 @@ This forces it to read the background before rendering."
   (defadvice! +org--src-lazy-load-library-a (lang)
     "Lazy load a babel package to ensure syntax highlighting."
     :before #'org-src--get-lang-mode
-    (or (cdr (assoc lang org-src-lang-modes))
+    (or (cdr (assoc lang (bound-and-true-p org-src-lang-modes)))
         (+org--babel-lazy-load lang)))
 
   ;; This also works for tangling
@@ -491,7 +493,7 @@ relative to `org-directory', unless it is an absolute path."
         org-latex-prefer-user-labels t)
 
   (when (featurep! :lang markdown)
-    (add-to-list 'org-export-backends 'md))
+    (add-to-list 'org-export-backends 'md nil #'eq))
 
   (use-package! ox-hugo
     :when (featurep! +hugo)
@@ -502,7 +504,7 @@ relative to `org-directory', unless it is an absolute path."
     :when (executable-find "pandoc")
     :after ox
     :init
-    (add-to-list 'org-export-backends 'pandoc)
+    (add-to-list 'org-export-backends 'pandoc nil #'eq)
     (setq org-pandoc-options
           '((standalone . t)
             (mathjax . t)
@@ -528,24 +530,26 @@ the exported output (i.e. formatters)."
       (apply orig-fn args))))
 
 
-(defun +org-init-habit-h ()
-  (add-hook! 'org-agenda-mode-hook
-    (defun +org-habit-resize-graph-h ()
-      "Right align and resize the consistency graphs based on
+(defun +org-habit-resize-graph-h ()
+  "Right align and resize the consistency graphs based on
 `+org-habit-graph-window-ratio'"
-      (when (featurep 'org-habit)
-        (let* ((total-days (float (+ org-habit-preceding-days org-habit-following-days)))
-               (preceding-days-ratio (/ org-habit-preceding-days total-days))
-               (graph-width (floor (* (window-width) +org-habit-graph-window-ratio)))
-               (preceding-days (floor (* graph-width preceding-days-ratio)))
-               (following-days (- graph-width preceding-days))
-               (graph-column (- (window-width) (+ preceding-days following-days)))
-               (graph-column-adjusted (if (> graph-column +org-habit-min-width)
-                                          (- graph-column +org-habit-graph-padding)
-                                        nil)))
-          (setq-local org-habit-preceding-days preceding-days)
-          (setq-local org-habit-following-days following-days)
-          (setq-local org-habit-graph-column graph-column-adjusted))))))
+  (when (featurep 'org-habit)
+    (bound! (org-habit-preceding-days org-habit-following-days)
+      (let* ((total-days (float (+ org-habit-preceding-days org-habit-following-days)))
+             (preceding-days-ratio (/ org-habit-preceding-days total-days))
+             (graph-width (floor (* (window-width) +org-habit-graph-window-ratio)))
+             (preceding-days (floor (* graph-width preceding-days-ratio)))
+             (following-days (- graph-width preceding-days))
+             (graph-column (- (window-width) (+ preceding-days following-days)))
+             (graph-column-adjusted (if (> graph-column +org-habit-min-width)
+                                        (- graph-column +org-habit-graph-padding)
+                                      nil)))
+        (setq-local org-habit-preceding-days preceding-days)
+        (setq-local org-habit-following-days following-days)
+        (setq-local org-habit-graph-column graph-column-adjusted)))))
+
+(defun +org-init-habit-h ()
+  (add-hook 'org-agenda-mode-hook #'+org-habit-resize-graph-h))
 
 
 (defun +org-init-hacks-h ()
@@ -559,7 +563,8 @@ the exported output (i.e. formatters)."
   ;;      to be especially memory hungry). Compounded with
   ;;      `inhibit-compacting-font-caches' being non-nil, org needs more memory
   ;;      to be performant.
-  (setq-hook! 'org-mode-hook gcmh-high-cons-threshold (* 2 gcmh-high-cons-threshold))
+  (setq-hook! 'org-mode-hook
+    gcmh-high-cons-threshold (* 2 gcmh-high-cons-threshold))
 
   (defadvice! +org--recenter-after-follow-link-a (&rest _args)
     "Recenter after following a link, but only internal or file links."
@@ -576,13 +581,12 @@ eldoc string."
     :around #'org-format-outline-path
     (funcall orig-fn
              (cl-loop for part in path
-                      ;; Remove full link syntax
-                      for fixedpart = (replace-regexp-in-string org-link-any-re "\\4" (or part ""))
-                      for n from 0
-                      for face = (nth (% n org-n-level-faces) org-level-faces)
-                      collect
-                      (org-add-props fixedpart
-                          nil 'face `(:foreground ,(face-foreground face nil t) :weight bold)))
+                ;; Remove full link syntax
+                for fixedpart = (replace-regexp-in-string org-link-any-re "\\4" (or part ""))
+                for n from 0
+                for face = (nth (% n org-n-level-faces) org-level-faces)
+                collect (org-add-props fixedpart nil
+                          'face `(:foreground ,(face-foreground face nil t) :weight bold)))
              width prefix separator))
 
   (after! org-eldoc
@@ -605,7 +609,7 @@ eldoc string."
 workspace."
       (when (and org-agenda-new-buffers
                  (bound-and-true-p persp-mode)
-                 (not org-agenda-sticky))
+                 (not (bound-and-true-p org-agenda-sticky)))
         (let (persp-autokill-buffer-on-remove)
           (persp-remove-buffer org-agenda-new-buffers
                                (get-current-persp)
