@@ -418,16 +418,9 @@
 (map! "C-'" #'imenu
 
       ;;; Text scaling
-      [C-mouse-4] #'text-scale-increase
-      [C-mouse-5] #'text-scale-decrease
-      [C-down-mouse-2] (cmd! (text-scale-set 0))
       "M-+" #'doom/reset-font-size
       "M-=" #'doom/increase-font-size
       "M--" #'doom/decrease-font-size
-
-      ;;; newlines
-      [remap newline]  #'newline-and-indent
-      "C-j"            #'+default/newline
 
       ;;; search
       (:when (featurep! :completion ivy)

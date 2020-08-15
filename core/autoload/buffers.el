@@ -187,9 +187,11 @@ If DERIVED-P, test with `derived-mode-p', otherwise use `eq'."
 ;;;###autoload
 (defun doom-visible-buffers (&optional buffer-list)
   "Return a list of visible buffers (i.e. not buried)."
-  (if buffer-list
-      (doom-keep #'get-buffer-window buffer-list)
-    (delete-dups (mapcar #'window-buffer (window-list)))))
+  (let ((buffers (mapcar #'window-buffer (window-list))))
+    (delete-dups
+     (if buffer-list
+         (doom-keep (lambda (b) (memq b buffer-list)) buffers)
+       buffers))))
 
 ;;;###autoload
 (defun doom-buried-buffers (&optional buffer-list)
@@ -274,6 +276,13 @@ See `doom-real-buffer-p' for an explanation for real buffers."
 
 ;;
 ;; Interactive commands
+
+;;;###autoload
+(defun doom/save-and-kill-buffer ()
+  "Save the current buffer to file, then kill it."
+  (interactive)
+  (save-buffer)
+  (kill-current-buffer))
 
 ;;;###autoload
 (defun doom/kill-this-buffer-in-all-windows (buffer &optional dont-save)

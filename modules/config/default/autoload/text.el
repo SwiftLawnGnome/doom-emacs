@@ -6,7 +6,7 @@
 (declare-function doom-point-in-string-p "text")
 
 ;;;###autoload
-(defalias '+default/newline #'newline)
+(defalias '+default/newline #'electric-indent-just-newline)
 
 ;;;###autoload
 (defun +default/newline-above ()

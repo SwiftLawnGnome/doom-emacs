@@ -293,8 +293,7 @@ If on a:
                  'done))))
        ;; Update any metadata or inline previews in this subtree
        (org-update-checkbox-count)
-       (let (org-hierarchical-todo-statistics)
-         (org-update-parent-todo-statistics))
+       (org-update-parent-todo-statistics)
        (when (and (fboundp 'toc-org-insert-toc)
                   (member "TOC" (org-get-tags)))
          (toc-org-insert-toc)
@@ -378,6 +377,15 @@ If on a:
          (+org--toggle-inline-images-in-subtree
           (org-element-property :begin context)
           (org-element-property :end context)))))))
+
+;;;###autoload
+(defun +org/shift-return (&optional arg)
+  "Insert a literal newline, or dwim in tables.
+Executes `org-table-copy-down' if in table."
+  (interactive "p")
+  (if (org-at-table-p)
+      (org-table-copy-down arg)
+    (org-return nil arg)))
 
 
 ;; I use these instead of `org-insert-item' or `org-insert-heading' because they
@@ -515,8 +523,7 @@ Made for `org-tab-first-hook' in evil-mode."
 (defun +org-update-cookies-h ()
   "Update statistics cookies/todo statistics in headlines."
   (when (and buffer-file-name (file-exists-p buffer-file-name))
-    (let (org-hierarchical-todo-statistics)
-      (org-update-parent-todo-statistics))))
+    (org-update-parent-todo-statistics)))
 
 ;;;###autoload
 (defun +org-yas-expand-maybe-h ()
@@ -569,18 +576,13 @@ All my (performant) foldings needs are met between this and `org-show-subtree'
           t)))))
 
 ;;;###autoload
-(defun +org-clear-babel-results-h ()
-  "Remove the results block for the org babel block at point."
-  (when (and (org-in-src-block-p t)
-             (org-babel-where-is-src-block-result))
-    (org-babel-remove-result)
-    t))
-
-;;;###autoload
 (defun +org-make-last-point-visible-h ()
   "Unfold subtree around point if saveplace places us in a folded region."
-  (and (not org-agenda-inhibit-startup)
-       (outline-invisible-p)
+  (and (not org-inhibit-startup)
+       (not org-inhibit-startup-visibility-stuff)
+       (org-invisible-p nil 'folding-only)
+       (or (not (org-on-heading-p))
+           (not (member "ARCHIVE" (org-get-tags))))
        (ignore-errors
          (save-excursion
            (outline-previous-visible-heading 1)

@@ -50,10 +50,6 @@
                                (not (memq (char-after) (list ?\( ?\[ ?\{ ?\} ?\] ?\))))))
                       #'yas-insert-snippet)
 
-      ;; Smarter newlines
-      :i [remap newline] #'newline-and-indent  ; auto-indent on newline
-      :i "C-j"           #'+default/newline    ; default behavior
-
       (:after help :map help-mode-map
        :n "o"       #'link-hint-open-link)
       (:after helpful :map helpful-mode-map
@@ -110,8 +106,8 @@
 
 ;;; :completion
 (map! (:when (featurep! :completion company)
-       :i "C-@"      #'+company/complete
-       :i "C-SPC"    #'+company/complete
+       :i "C-@"      (cmds! (not (minibufferp)) #'+company/complete)
+       :i "C-SPC"    (cmds! (not (minibufferp)) #'+company/complete)
        (:after company
         (:map company-active-map
          "C-w"     nil  ; don't interfere with `evil-delete-backward-word'
@@ -136,11 +132,7 @@
          "C-j"     #'company-select-next-or-abort
          "C-k"     #'company-select-previous-or-abort
          "C-s"     (cmd! (company-search-abort) (company-filter-candidates))
-         [escape]  #'company-search-abort))
-       ;; TAB auto-completion in term buffers
-       (:after comint :map comint-mode-map
-        "TAB" #'company-complete
-        [tab] #'company-complete))
+         [escape]  #'company-search-abort)))
 
       (:when (featurep! :completion ivy)
        (:after ivy

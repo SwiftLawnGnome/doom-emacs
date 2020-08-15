@@ -13,10 +13,13 @@
 
 ;; Ensure straight and the bare minimum is ready to go
 (require 'core-vars)
-(require 'core-modules)
+(eval-and-compile (require 'core-modules))
 (require 'core-packages)
 (doom-initialize-core-packages)
-(require 'core-cli-lib)
+(eval-and-compile (require 'core-cli-lib))
+
+;; Don't generate superfluous files when writing temp buffers
+(setq make-backup-files nil)
 
 ;;
 ;;; Variables
@@ -35,7 +38,6 @@ commands like `doom-cli-packages-install', `doom-cli-packages-update' and
 These are loaded when a Doom's CLI starts up. There users and modules can define
 additional CLI commands, or reconfigure existing ones to better suit their
 purpose.")
-
 
 ;;
 ;;; straight.el hacks

@@ -16,6 +16,7 @@ removing them from your ~doom!~ block in =$DOOMDIR/init.el=.
 - [[#email][:email]]
 - [[#input][:input]]
 - [[#lang][:lang]]
+- [[#os][:os]]
 - [[#term][:term]]
 - [[#tools][:tools]]
 - [[#ui][:ui]]
@@ -127,11 +128,11 @@ Modules that bring support for a language or group of languages to Emacs.
 + [[file:../modules/lang/nim/README.org][nim]] - TODO
 + nix - TODO
 + [[file:../modules/lang/ocaml/README.org][ocaml]] =+lsp= - TODO
-+ [[file:../modules/lang/org/README.org][org]] =+brain +dragndrop +gnuplot +hugo +ipython +journal +jupyter +noter +pandoc +pomodoro +present +roam= - TODO
++ [[file:../modules/lang/org/README.org][org]] =+brain +dragndrop +gnuplot +hugo +ipython +journal +jupyter +noter +pandoc +pomodoro +present +pretty +roam= - TODO
 + [[file:../modules/lang/php/README.org][php]] =+hack +lsp= - TODO
 + plantuml - TODO
 + purescript =+lsp= - TODO
-+ [[file:../modules/lang/python/README.org][python]] =+cython +lsp +pyenv +conda +poetry= - TODO
++ [[file:../modules/lang/python/README.org][python]] =+cython +lsp +pyright +pyenv +conda +poetry= - TODO
 + qt - TODO
 + racket - TODO
 + [[file:../modules/lang/raku/README.org][raku]] - TODO
@@ -148,6 +149,12 @@ Modules that bring support for a language or group of languages to Emacs.
 + terra - TODO
 + web =+lsp= - HTML and CSS (SCSS/SASS/LESS/Stylus) support.
 + [[file:../modules/lang/yaml/README.org][yaml]] =+lsp= - TODO
+
+
+* :os
+Modules to improve integration into your OS, system, or devices.
+
++ tty =+osc= - Improves the terminal Emacs experience.
 
 * :term
 Modules that offer terminal emulation.

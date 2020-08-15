@@ -147,7 +147,8 @@
        ((null pin)
         (funcall call "git" "clone" "--origin" "origin" repo-url repo-dir
                  "--depth" (number-to-string straight-vc-git-default-clone-depth)
-                 "--branch" straight-repository-branch))
+                 "--branch" straight-repository-branch
+                 "--single-branch" "--no-tags"))
        ((integerp straight-vc-git-default-clone-depth)
         (make-directory repo-dir t)
         (let ((default-directory repo-dir))
@@ -155,7 +156,8 @@
           (funcall call "git" "checkout" "-b" straight-repository-branch)
           (funcall call "git" "remote" "add" "origin" repo-url)
           (funcall call "git" "fetch" "origin" pin
-                   "--depth" (number-to-string straight-vc-git-default-clone-depth))
+                   "--depth" (number-to-string straight-vc-git-default-clone-depth)
+                   "--no-tags")
           (funcall call "git" "checkout" "--detach" pin)))))
     (require 'straight (concat repo-dir "/straight.el"))
     (doom-log "Initializing recipes")

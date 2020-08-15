@@ -46,10 +46,14 @@ and Emacs states, and for non-evil users.")
 ;;; Keybind settings
 
 (cond (IS-MAC
-       (and (boundp 'mac-command-modifier)
-            (boundp 'mac-option-modifier)
-            (setq mac-command-modifier 'super
-                  mac-option-modifier  'meta)))
+       (bound! (mac-command-modifier
+                mac-option-modifier
+                ns-command-modifier
+                ns-option-modifier)
+         (setq mac-command-modifier 'super
+               mac-option-modifier  'meta
+               ns-command-modifier  'super
+               ns-option-modifier   'meta)))
       (IS-WINDOWS
        (and (boundp 'w32-lwindow-modifier)
             (boundp 'w32-rwindow-modifier)

@@ -216,15 +216,6 @@ possible."
 ;; non-X systems (like Windows or macOS), where only `STRING' is used.
 (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
 
-;; Fixes the clipboard in tty Emacs by piping clipboard I/O through xclip, xsel,
-;; pb{copy,paste}, wl-copy, termux-clipboard-get, or getclip (cygwin); depending
-;; on what is available.
-(unless IS-WINDOWS
-  (add-hook! 'tty-setup-hook
-    (defun doom-init-clipboard-in-tty-emacs-h ()
-      (and (require 'clipetty nil t)
-           (global-clipetty-mode +1)))))
-
 
 ;;
 ;;; Extra file extensions to support
@@ -268,7 +259,9 @@ possible."
   (defun doom-auto-revert-buffer-h ()
     "Auto revert current buffer, if necessary."
     (or auto-revert-mode (active-minibuffer-window)
-        (bound! (#'auto-revert-handler) (auto-revert-handler))))
+        (bound! (#'auto-revert-handler)
+          (let ((auto-revert-mode t))
+            (auto-revert-handler)))))
 
   (defun doom-auto-revert-buffers-h ()
     "Auto revert stale buffers in visible windows, if necessary."
@@ -322,9 +315,12 @@ possible."
   (setq savehist-file (concat doom-cache-dir "savehist"))
   :config
   (setq savehist-save-minibuffer-history t
-        savehist-autosave-interval nil ; save on kill only
-        savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
-  (add-hook! 'kill-emacs-hook
+        savehist-autosave-interval nil     ; save on kill only
+        savehist-additional-variables
+        '(kill-ring                        ; persist clipboard
+          mark-ring global-mark-ring       ; persist marks
+          search-ring regexp-search-ring)) ; persist searches
+  (add-hook! 'savehist-save-hook
     (defun doom-unpropertize-kill-ring-h ()
       "Remove text properties from `kill-ring' for a smaller savehist file."
       (setq kill-ring (cl-loop for item in kill-ring
