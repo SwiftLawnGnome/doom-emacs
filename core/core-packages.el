@@ -118,10 +118,9 @@
       ;; We handle it ourselves
       straight-fix-org nil)
 
-(with-eval-after-load 'comp
-  ;; HACK Disable native-compilation for some troublesome files
-  (when (boundp 'comp-deferred-compilation-black-list)
-    (add-to-list 'comp-deferred-compilation-black-list "/evil-collection-vterm\\.el$")))
+(with-eval-after-load 'straight
+  ;; `let-alist' is built into Emacs 26 and onwards
+  (add-to-list 'straight-built-in-pseudo-packages 'let-alist))
 
 (defadvice! doom--read-pinned-packages-a (orig-fn &rest args)
   "Read `:pin's in `doom-packages' on top of straight's lockfiles."
