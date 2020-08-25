@@ -73,9 +73,8 @@ employed so that flycheck still does *some* helpful linting.")
   (set-lookup-handlers! '(emacs-lisp-mode lisp-interaction-mode helpful-mode)
     :definition    #'+emacs-lisp-lookup-definition
     :documentation #'+emacs-lisp-lookup-documentation)
-  (set-docsets! '(emacs-lisp-mode lisp-interaction-mode)
-    "Emacs Lisp" "Emacs-CL" "emacs")
-  (set-pretty-symbols! 'emacs-lisp-mode :lambda "lambda")
+  (set-docsets! '(emacs-lisp-mode lisp-interaction-mode) "Emacs Lisp")
+  (set-ligatures! 'emacs-lisp-mode :lambda "lambda")
   (set-rotate-patterns! 'emacs-lisp-mode
     :symbols '(("t" "nil")
                ("let" "let*")

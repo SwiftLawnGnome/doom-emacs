@@ -8,9 +8,21 @@
 (eval-when-compile
   (require 'cl-lib))
 
+(defvar doom-cli-log-file (concat doom-local-dir "doom.log")
+  "File to write the extended output to.")
+
+(defvar doom-cli-log-error-file (concat doom-local-dir "doom.error.log")
+  "File to write the last backtrace to.")
+
 (defvar doom--cli-commands (make-hash-table :test 'equal))
 (defvar doom--cli-groups (make-hash-table :test 'equal))
 (defvar doom--cli-group nil)
+
+(define-error 'doom-cli-error "There was an unexpected error" 'doom-error)
+(define-error 'doom-cli-command-not-found-error "Could not find that command" 'doom-cli-error)
+(define-error 'doom-cli-wrong-number-of-arguments-error "Wrong number of CLI arguments" 'doom-cli-error)
+(define-error 'doom-cli-unrecognized-option-error "Not a recognized option" 'doom-cli-error)
+(define-error 'doom-cli-deprecated-error "Command is deprecated" 'doom-cli-error)
 
 (cl-defstruct
     (doom-cli
@@ -18,15 +30,16 @@
       (:constructor
           make-doom-cli
           (name &key desc aliases optlist arglist plist fn
-                &aux (optlist
-                      (cl-loop for (symbol options desc) in optlist
-                         for ((_ . soptions) (_ . params))
-                          = (seq-group-by #'stringp options)
-                         collect
-                          (make-doom-cli-option :symbol symbol
-                                                :flags soptions
-                                                :args params
-                                                :desc desc))))))
+                &aux
+                  (optlist
+                   (cl-loop for (symbol opts desc) in optlist
+                      for ((_ . options) (_ . params))
+                       = (seq-group-by #'stringp opts)
+                      collect
+                       (make-doom-cli-option :symbol symbol
+                                             :flags options
+                                             :args params
+                                             :desc desc))))))
   (name nil :read-only t)
   (desc "TODO")
   aliases
@@ -115,10 +128,9 @@
 (defun doom-cli-get (command)
   "Return a CLI object associated by COMMAND name (string)."
   (while (and command (not (doom-cli-p command)))
-    (setq command (gethash (cond
-                             ((symbolp command) command)
-                             ((stringp command) (intern command))
-                             (command))
+    (setq command (gethash (if (stringp command)
+                               (intern command)
+                             command)
                            doom--cli-commands)))
   command)
 
@@ -135,43 +147,6 @@ COMMAND, and passes ARGS to it."
       (funcall (doom-cli-fn cli)
                (doom--cli-process cli (remq nil args)))
     (user-error "Couldn't find any %S command" command)))
-
-(defun doom-cli--execute-after (lines)
-  (let ((post-script (concat doom-local-dir ".doom.sh"))
-        (coding-system-for-write 'utf-8)
-        (coding-system-for-read  'utf-8))
-    (with-temp-file post-script
-      (insert "#!/usr/bin/env sh\n"
-              (save-match-data
-                (cl-loop for env in process-environment
-                   if (string-match "^\\([a-zA-Z0-9_]+\\)=\\(.+\\)$" env)
-                   concat (format "export %s=%s;\n"
-                                  (match-string 1 env)
-                                  (shell-quote-argument (match-string 2 env)))))
-              (format "\nexport PATH=\"%s:$PATH\"\n" (concat doom-emacs-dir "bin/"))
-              "\n[ -x \"$0\" ] && rm -f \"$0\"\n"
-              (if (stringp lines)
-                  lines
-                (string-join
-                 (if (listp (car-safe lines))
-                     (cl-loop for line in (doom-enlist lines)
-                        collect (mapconcat #'shell-quote-argument (remq nil line) " "))
-                   (list (mapconcat #'shell-quote-argument (remq nil lines) " ")))
-                 "\n"))
-              "\n"))
-    (set-file-modes post-script #o700)))
-
-(defun doom-cli-execute-after (&rest args)
-  "Execute shell command ARGS after this CLI session quits.
-
-This is particularly useful when the capabilities of Emacs' batch terminal are
-insufficient (like opening an instance of Emacs, or reloading Doom after a 'doom
-upgrade')."
-  (doom-cli--execute-after args))
-
-(defun doom-cli-execute-lines-after (&rest lines)
-  "TODO"
-  (doom-cli--execute-after (string-join lines "\n")))
 
 ;;;###autoload
 (defmacro defcli! (name speclist &optional docstring &rest body)

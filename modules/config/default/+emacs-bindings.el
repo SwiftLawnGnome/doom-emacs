@@ -204,7 +204,7 @@
        (:when (featurep! :term eshell)
         :desc "Toggle eshell popup"           "e" #'+eshell/toggle
         :desc "Open eshell here"              "E" #'+eshell/here)
-       (:when (featurep! :tools macos)
+       (:when (featurep! :os macos)
         :desc "Reveal in Finder"           "o" #'+macos/reveal-in-finder
         :desc "Reveal project in Finder"   "O" #'+macos/reveal-project-in-finder
         :desc "Send to Transmit"           "u" #'+macos/send-to-transmit
@@ -279,8 +279,10 @@
        (:when (featurep! :lang org +present)
         :desc "org-tree-slide mode"        "p" #'org-tree-slide-mode)
        :desc "Read-only mode"               "r" #'read-only-mode
-       (:when (featurep! :checkers spell)
-        :desc "Flyspell"                   "s" #'flyspell-mode)
+       (:when (and (featurep! :checkers spell) (not (featurep! :checkers spell +flyspell)))
+        :desc "Spell checker"              "s" #'spell-fu-mode)
+       (:when (featurep! :checkers spell +flyspell)
+        :desc "Spell checker"              "s" #'flyspell-mode)
        (:when (featurep! :lang org +pomodoro)
         :desc "Pomodoro timer"             "t" #'org-pomodoro)
        (:when (featurep! :ui zen)

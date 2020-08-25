@@ -206,10 +206,20 @@ processed."
         (error "Failed to read any packages"))
     (dolist (package doom-packages)
       (cl-destructuring-bind
-          (name &key recipe disable ignore &allow-other-keys) package
+          (name &key recipe disable ignore shadow &allow-other-keys) package
         (unless ignore
           (if disable
               (cl-pushnew name doom-disabled-packages)
+            (when shadow
+              (straight-override-recipe (cons shadow '(:local-repo nil)))
+              (let ((site-load-path (copy-sequence doom--initial-load-path))
+                    lib)
+                (while (setq
+                        lib (locate-library (concat (symbol-name shadow) ".el")
+                                            nil site-load-path))
+                  (let ((lib (directory-file-name (file-name-directory lib))))
+                    (setq site-load-path (delete lib site-load-path)
+                          load-path (delete lib load-path))))))
             (when recipe
               (straight-override-recipe (cons name recipe)))
             (straight-register-package name)))))))
@@ -352,6 +362,7 @@ installed."
 If ALL-P, gather packages unconditionally across all modules, including disabled
 ones."
   (let ((packages-file (concat doom-packages-file ".el"))
+        doom-disabled-packages
         doom-packages)
     (doom--read-packages
      (doom-path doom-core-dir packages-file) all-p 'noerror)
@@ -363,10 +374,12 @@ ones."
                   (doom-files-in doom-modules-dir
                                  :depth 2
                                  :match "/packages\\.el$"))
-          ;; We load the private packages file twice to ensure disabled packages
-          ;; are seen ASAP, and a second time to ensure privately overridden
-          ;; packages are properly overwritten.
-          (doom--read-packages private-packages nil 'noerror)
+          ;; We load the private packages file twice to populate
+          ;; `doom-disabled-packages' disabled packages are seen ASAP, and a
+          ;; second time to ensure privately overridden packages are properly
+          ;; overwritten.
+          (let (doom-packages)
+            (doom--read-packages private-packages nil 'noerror))
           (cl-loop for key being the hash-keys of doom-modules
                    for path = (doom-module-path (car key) (cdr key) packages-file)
                    for doom--current-module = key
@@ -407,7 +420,7 @@ ones."
 ;;; Module package macros
 
 (cl-defmacro package!
-    (name &rest plist &key built-in recipe ignore _type _pin _disable)
+    (name &rest plist &key built-in recipe ignore _type _pin _disable _shadow)
   "Declares a package and how to install it (if applicable).
 
 This macro is declarative and does not load nor install packages. It is used to
@@ -444,6 +457,10 @@ Accepts the following properties:
    inform help commands like `doom/help-packages' that this is a built-in
    package. If set to 'prefer, the package will not be installed if it is
    already provided by Emacs.
+ :shadow PACKAGE
+   Informs Doom that this package is shadowing a built-in PACKAGE; the original
+   package will be removed from `load-path' to mitigate conflicts, and this new
+   package will satisfy any dependencies on PACKAGE in the future.
 
 Returns t if package is successfully registered, and nil if it was disabled
 elsewhere."
@@ -504,9 +521,10 @@ elsewhere."
         (signal 'doom-package-error
                 (list ,(symbol-name name)
                       (error-message-string e)))))
-     ;; This is the only side-effect of this macro!
+     ;; These are the only side-effects of this macro!
      (setf (alist-get name doom-packages) plist)
-     (unless (plist-get plist :disable)
+     (if (plist-get plist :disable)
+         (add-to-list 'doom-disabled-packages name)
        (with-no-warnings
          (cons name plist)))))
 

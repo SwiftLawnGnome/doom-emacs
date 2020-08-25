@@ -49,11 +49,13 @@ and Emacs states, and for non-evil users.")
        (bound! (mac-command-modifier
                 mac-option-modifier
                 ns-command-modifier
-                ns-option-modifier)
+                ns-option-modifier
+                ns-right-option-modifier)
          (setq mac-command-modifier 'super
                mac-option-modifier  'meta
                ns-command-modifier  'super
-               ns-option-modifier   'meta)))
+               ns-option-modifier   'meta
+               ns-right-option-modifier 'none)))
       (IS-WINDOWS
        (and (boundp 'w32-lwindow-modifier)
             (boundp 'w32-rwindow-modifier)

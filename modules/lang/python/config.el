@@ -31,7 +31,7 @@ called.")
   (set-repl-handler! 'python-mode #'+python/open-repl :persist t)
   (set-docsets! 'python-mode "Python 3" "NumPy" "SciPy")
 
-  (set-pretty-symbols! 'python-mode
+  (set-ligatures! 'python-mode
     ;; Functional
     :def "def"
     :lambda "lambda"
@@ -247,7 +247,7 @@ called.")
   (pyenv-mode +1)
   (when (executable-find "pyenv")
     (add-to-list 'exec-path (expand-file-name "shims" (or (getenv "PYENV_ROOT") "~/.pyenv"))))
-  (add-hook 'python-mode-hook #'+python-pyenv-mode-set-auto-h)
+  (add-hook 'python-mode-local-vars-hook #'+python-pyenv-mode-set-auto-h)
   (add-hook 'doom-switch-buffer-hook #'+python-pyenv-mode-set-auto-h))
 
 
@@ -316,11 +316,11 @@ called.")
 
   (use-package! lsp-python-ms
     :unless (featurep! +pyright)
-    :after lsp-clients
+    :after lsp-mode
     :preface
     (after! python
       (setq lsp-python-ms-python-executable-cmd python-shell-interpreter)))
 
   (use-package! lsp-pyright
     :when (featurep! +pyright)
-    :after lsp-clients))
+    :after lsp-mode))

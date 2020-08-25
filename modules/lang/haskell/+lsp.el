@@ -7,7 +7,7 @@
 (declare-function lsp! "common")
 
 (use-package! lsp-haskell
-  :after lsp-clients
+  :after lsp-mode
   :preface (add-hook 'haskell-mode-local-vars-hook #'lsp!)
   :config
   (when IS-MAC

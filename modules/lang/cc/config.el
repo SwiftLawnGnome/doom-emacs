@@ -51,7 +51,7 @@ This is ignored by ccls.")
   (set-rotate-patterns! 'c++-mode
     :symbols '(("public" "protected" "private")
                ("class" "struct")))
-  (set-pretty-symbols! '(c-mode c++-mode)
+  (set-ligatures! '(c-mode c++-mode)
     ;; Functional
     ;; :def "void "
     ;; Types
@@ -252,7 +252,8 @@ If rtags or rdm aren't available, fail silently instead of throwing a breaking e
 
 
 (use-package! ccls
-  :when (and (featurep! +lsp) (not (featurep! :tools lsp +eglot)))
+  :when (featurep! +lsp)
+  :unless (featurep! :tools lsp +eglot)
   :after lsp
   :init
   (after! projectile
