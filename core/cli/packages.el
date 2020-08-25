@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; core/cli/packages.el
 
 (defcli! (update u) (&rest _)
@@ -230,12 +230,21 @@ declaration) or dependency thereof that hasn't already been."
        nil))))
 
 
+(defvar comp-async-env-modifier-form)
+
 (defun doom-cli-packages-build (&optional force-p)
   "(Re)build all packages."
   (doom-initialize-packages)
   (print! (start "(Re)building %spackages...") (if force-p "all " ""))
   (print-group!
-   (let ((straight-check-for-modifications
+   (let ((comp-async-env-modifier-form
+          `(progn
+             ,(bound-and-true-p comp-async-env-modifier-form)
+             (setq comp-eln-load-path
+                   ',(cl-adjoin (concat doom-cache-dir "eln/")
+                                (bound-and-true-p comp-eln-load-path)
+                                :test #'equal))))
+         (straight-check-for-modifications
           (when (file-directory-p (straight--modified-dir))
             '(find-when-checking)))
          (straight--allow-find

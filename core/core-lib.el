@@ -589,12 +589,12 @@ advised)."
            (cond ((functionp ,sym) (advice-remove ,sym #',fn))
                  ((symbolp ,sym)   (remove-hook ,sym #',fn)))
            (unintern ',fn nil))
-         (when (fboundp ',fn)
-           (cond ((functionp ,sym)
-                  (advice-add ,hook-or-function ,(if append :after :before) #',fn))
-                 ((symbolp ,sym)
-                  (put ',fn 'permanent-local-hook t)
-                  (add-hook ,sym #',fn ,append))))))))
+         (cond
+           ((functionp ,sym)
+            (advice-add ,hook-or-function ,(if append :after :before) ',fn))
+           ((symbolp ,sym)
+            (put ',fn 'permanent-local-hook t)
+            (add-hook ,sym ',fn ,append)))))))
 
 (defmacro add-hook-trigger! (hook-var &rest targets)
   "TODO"

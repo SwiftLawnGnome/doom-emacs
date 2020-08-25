@@ -272,14 +272,14 @@ verbosity when editing a file in `doom-private-dir' or `doom-emacs-dir'."
     (goto-char (match-beginning 0))
     (and (stringp (plist-get (sexp-at-point) :pin))
          (search-forward ":pin" nil t)
-         (let ((start (re-search-forward "\"[^\"\n]\\{10\\}" nil t))
-               (finish (and (re-search-forward "\"" (line-end-position) t)
-                            (match-beginning 0))))
-           (when (and start finish)
-             (put-text-property start finish 'display "...")))))
+         (let ((start (re-search-forward "\"[^\"\n]\\{10\\}" nil t)))
+           (and start
+                (re-search-forward "\"" (line-end-position) t)
+                (put-text-property start (match-beginning 0) 'display "...")))))
   nil)
 
 (defvar +emacs-lisp--face nil)
+
 ;;;###autoload
 (defun +emacs-lisp-highlight-vars-and-faces (end)
   "Match defined variables and functions.
@@ -287,45 +287,50 @@ verbosity when editing a file in `doom-private-dir' or `doom-emacs-dir'."
 Functions are differentiated into special forms, built-in functions and
 library/userland functions"
   (catch 'matcher
-    (while (re-search-forward "\\(?:\\sw\\|\\s_\\)+" end t)
+    (while (re-search-forward lisp-mode-symbol-regexp end t)
       (let ((ppss (save-excursion (syntax-ppss))))
-        (cond ((ppss-string-terminator ppss)  ; strings
+        (cond ((ppss-string-terminator ppss) ; strings
                (search-forward "\"" end t))
-              ((ppss-comment-depth ppss)  ; comments
+              ((ppss-comment-depth ppss) ; comments
                (forward-line +1))
-              ((let ((symbol (intern-soft (match-string-no-properties 0))))
-                 (and (cond ((null symbol) nil)
-                            ((eq symbol t) nil)
-                            ((special-variable-p symbol)
-                             (setq +emacs-lisp--face 'font-lock-variable-name-face))
-                            ((and (fboundp symbol)
-                                  (eq (char-before (match-beginning 0)) ?\()
-                                  (not (memq (char-before (1- (match-beginning 0)))
-                                             (list ?\' ?\`))))
-                             (let ((unaliased (indirect-function symbol)))
-                               (unless (or (macrop unaliased)
-                                           (special-form-p unaliased))
-                                 (let (unadvised)
-                                   (while (not (eq (setq unadvised (ad-get-orig-definition unaliased))
-                                                   (setq unaliased (indirect-function unadvised)))))
-                                   unaliased)
-                                 (setq +emacs-lisp--face
-                                       (if (and (subrp unaliased)
-                                                (or (eval-when-compile (not (fboundp 'subr-native-elisp-p)))
-                                                    (not (subr-native-elisp-p unaliased))))
-                                           'font-lock-constant-face
-                                         'font-lock-function-name-face))))))
-                      (throw 'matcher t)))))))
+              (t (let ((symbol (intern-soft (match-string-no-properties 0))))
+                   (cond
+                     ((null symbol) nil)
+                     ((eq symbol t) nil)
+                     ((special-variable-p symbol)
+                      (setq +emacs-lisp--face 'font-lock-variable-name-face)
+                      (throw 'matcher t))
+                     ((and (fboundp symbol)
+                           (eq (char-before (match-beginning 0)) ?\()
+                           (not (memq (char-before (1- (match-beginning 0))) (list ?\' ?\`))))
+                      (let* ((unaliased symbol) (is-subr nil))
+                        (while (not (or (eq 'macro (car-safe (setq unaliased (indirect-function unaliased))))
+                                        (eq unaliased (setq unaliased (ad-get-orig-definition unaliased))))))
+                        (unless (or (eq (car-safe unaliased) 'macro)
+                                    (and (eq 'autoload (car-safe unaliased))
+                                         (memq (nth 4 unaliased) '(macro t)))
+                                    (and (setq is-subr (subrp unaliased))
+                                         (eq (cdr (subr-arity unaliased)) 'unevalled)))
+                          (setq +emacs-lisp--face
+                                (cl-macrolet ((real-subr? ()
+                                                ;; compute the check at compile time
+                                                (if (not (fboundp 'subr-native-elisp-p))
+                                                    'is-subr
+                                                  '(and is-subr (not (subr-native-elisp-p unaliased))))))
+                                  (if (real-subr?)
+                                      'font-lock-constant-face
+                                    'font-lock-function-name-face)))
+                          (throw 'matcher t))))))))))
     nil))
 
 ;; HACK Fontification is already expensive enough. We byte-compile
 ;;      `+emacs-lisp-highlight-vars-and-faces' and `+emacs-lisp-truncate-pin' to
 ;;      ensure they run as fast as possible:
 (dolist (fn '(+emacs-lisp-highlight-vars-and-faces +emacs-lisp-truncate-pin))
-  (when (consp (indirect-function fn)) ;; don't use `byte-code-function-p', it could be native-compiled
+  (when (consp (indirect-function fn))
     (with-no-warnings
       (or (and (fboundp 'native-compile)
                (fboundp 'native-comp-available-p)
                (native-comp-available-p)
-               (ignore-errors (native-compile fn)))
+               (ignore-errors (native-compile fn) t))
           (byte-compile fn)))))

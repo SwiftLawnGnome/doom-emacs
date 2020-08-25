@@ -5,7 +5,7 @@
   (require 'core-modules))
 (require 'core-lib)
 
-(defvar dash-docs-docsets)
+(defvar-local dash-docs-docsets nil)
 (defvar dash-docs-common-docsets)
 (defvar dash-docs-browser-func)
 (defvar +lookup-open-url-fn)
@@ -82,7 +82,7 @@ Docsets must be installed with one of the following commands:
 Docsets can be searched directly via `+lookup/in-docsets'."
   (when (require 'dash-docs nil t)
     (when-let (docsets (doom-keep #'dash-docs-docset-path
-                                  (bound-and-true-p dash-docs-docsets)))
+                                  dash-docs-docsets))
       (+lookup/in-docsets nil identifier docsets)
       'deferred)))
 

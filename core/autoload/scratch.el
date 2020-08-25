@@ -1,7 +1,7 @@
 ;;; core/autoload/scratch.el -*- lexical-binding: t; -*-
 
 (require 'core-vars)
-(eval-when-compile (require 'core-lib))
+(eval-and-compile (require 'core-lib))
 
 (defvar doom-scratch-default-file "__default"
   "The default file name for a project-less scratch buffer.
@@ -21,16 +21,15 @@ the first, fresh scratch buffer you create. This accepts:
   nil         Uses `fundamental-mode'
   MAJOR-MODE  Any major mode symbol")
 
-(defvar doom-scratch-buffers nil
+(defvar doom-scratch-buffers ()
   "A list of active scratch buffers.")
 
-(defvar doom-scratch-current-project nil
+(defvar-local doom-scratch-current-project nil
   "The name of the project associated with the current scratch buffer.")
 (put 'doom-scratch-current-project 'permanent-local t)
 
 (defvar doom-scratch-buffer-hook ()
   "The hooks to run after a scratch buffer is created.")
-
 
 (defun doom--load-persistent-scratch-buffer (project-name)
   (setq-local doom-scratch-current-project
@@ -61,20 +60,20 @@ the first, fresh scratch buffer you create. This accepts:
          (buffer (get-buffer buffer-name)))
     (with-current-buffer
         (or buffer (get-buffer-create buffer-name))
+      (cl-pushnew (current-buffer) doom-scratch-buffers :test #'eq)
       (setq default-directory directory)
       (setq-local so-long--inhibited t)
-      (if dont-restore-p
-          (erase-buffer)
-        (unless buffer
-          (doom--load-persistent-scratch-buffer project-name)
-          (when (and (eq major-mode 'fundamental-mode)
-                     (functionp mode))
-            (funcall mode))))
-      (cl-pushnew (current-buffer) doom-scratch-buffers)
-      (add-transient-hook! 'doom-switch-buffer-hook (doom-persist-scratch-buffers-h))
-      (add-transient-hook! 'doom-switch-window-hook (doom-persist-scratch-buffers-h))
+      (cond
+        (dont-restore-p (erase-buffer))
+        ((not buffer)
+         (doom--load-persistent-scratch-buffer project-name)
+         (and (eq major-mode 'fundamental-mode)
+              (functionp mode)
+              (funcall mode))))
+      (add-hook 'doom-switch-buffer-hook #'doom-persist-scratch-buffers-h nil t)
+      (add-hook 'doom-switch-window-hook #'doom-persist-scratch-buffers-h nil t)
       (add-hook 'kill-buffer-hook #'doom-persist-scratch-buffer-h nil 'local)
-      (run-hooks 'doom-scratch-buffer-created-hook)
+      (run-hooks 'doom-scratch-buffer-hook)
       (current-buffer))))
 
 
@@ -92,9 +91,7 @@ the first, fresh scratch buffer you create. This accepts:
                                       doom-scratch-default-file)
                                   ".el")
                           doom-scratch-dir)
-      (prin1 (list content
-                   point
-                   mode)
+      (prin1 (list content point mode)
              (current-buffer)))))
 
 ;;;###autoload
@@ -142,8 +139,6 @@ If PROJECT-P is non-nil, open a persistent scratch buffer associated with the
                          (derived-mode-p 'special-mode)
                          (string-match-p "^ ?\\*" (buffer-name)))
                major-mode))
-            ((null doom-scratch-initial-major-mode)
-             nil)
             ((symbolp doom-scratch-initial-major-mode)
              doom-scratch-initial-major-mode))
       default-directory
@@ -179,7 +174,7 @@ If passed the prefix ARG, do not restore the last scratch buffer."
 (defun doom/revert-scratch-buffer ()
   "Revert scratch buffer to last persistent state."
   (interactive)
-  (unless (string-match-p "^\\*doom:scratch" (buffer-name))
+  (unless (memq (current-buffer) doom-scratch-buffers)
     (user-error "Not in a scratch buffer"))
   (when (doom--load-persistent-scratch-buffer doom-scratch-current-project)
     (message "Reloaded scratch buffer")))
@@ -188,10 +183,10 @@ If passed the prefix ARG, do not restore the last scratch buffer."
 (defun doom/delete-persistent-scratch-file (&optional arg)
   "Deletes a scratch buffer file in `doom-scratch-dir'.
 
-If prefix ARG, delete all persistent scratches."
+With prefix ARG, delete all persistent scratches."
   (interactive)
   (if arg
-      (progn
+      (when (y-or-n-p "Delete all persistent scratches?")
         (delete-directory doom-scratch-dir t)
         (message "Cleared %S" (abbreviate-file-name doom-scratch-dir)))
     (make-directory doom-scratch-dir t)
