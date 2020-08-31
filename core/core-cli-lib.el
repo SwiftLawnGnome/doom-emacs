@@ -138,7 +138,7 @@
   "Return non-nil if CLI is an internal (non-public) command."
   (string-prefix-p ":" (doom-cli-name cli)))
 
-(defun doom-cli-execute (command &optional args)
+(defun doom-cli-execute (command &rest args)
   "Execute COMMAND (string) with ARGS (list of strings).
 
 Executes a cli defined with `defcli!' with the name or alias specified by

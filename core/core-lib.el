@@ -367,10 +367,13 @@ This is a variadic `cl-pushnew'."
 (defmacro add-load-path! (&rest dirs)
   "Add DIRS to `load-path', relative to the current file.
 The current file is the file from which `add-to-load-path!' is used."
-  `(let ((default-directory ,(dir!))
-         file-name-handler-alist)
-     (dolist (dir (list ,@dirs))
-       (cl-pushnew (expand-file-name dir) load-path :test #'string=))))
+  (let ((s (gensym "dir")))
+    `(let ((default-directory ,(dir!))
+           file-name-handler-alist)
+       ,@(mapcar (lambda (dir)
+                   `(let ((,s (expand-file-name ,dir)))
+                      (unless (member ,s load-path) (push ,s load-path))))
+                 (delete-dups (copy-sequence dirs))))))
 
 (defmacro after! (package &rest body)
   "Evaluate BODY after PACKAGE have loaded.
@@ -422,7 +425,7 @@ This is a wrapper around `eval-after-load' that:
   ;;              (setq body `((after! ,next ,@body))))
   ;;            (car body)))))
 
-  ;; NOTE doing it this convoluted way prevents the same chunk of code being
+  ;; NOTE doing it this convoluted way prevents large chunks of code being
   ;; duplicated in complex PACKAGE specs
   (let (_) ;; this is `dlet' in emacs 28
     (defvar doom--after-func)
@@ -453,18 +456,21 @@ This is a wrapper around `eval-after-load' that:
 
 (defun doom--handle-load-error (e target path)
   (let* ((source (file-name-sans-extension target))
-         (err (cond ((not (featurep 'core))
-                     (cons 'error (file-name-directory path)))
-                    ((file-in-directory-p source (bound-and-true-p doom-core-dir))
-                     (cons 'doom-error (bound-and-true-p doom-core-dir)))
-                    ((file-in-directory-p source (bound-and-true-p doom-private-dir))
-                     (cons 'doom-private-error (bound-and-true-p doom-private-dir)))
-                    ((cons 'doom-module-error (bound-and-true-p doom-emacs-dir))))))
-    (signal (car err)
-            (list (file-relative-name
-                    (concat source ".el")
-                    (cdr err))
-                  e))))
+         (err nil)
+         (dir nil))
+    (cond
+      ((not (featurep 'core))
+       (setq err 'error)
+       (setq dir (file-name-directory path)))
+      ((file-in-directory-p source doom-core-dir)
+       (setq err 'doom-error)
+       (setq dir doom-core-dir))
+      ((file-in-directory-p source doom-private-dir)
+       (setq err 'doom-private-error)
+       (setq dir doom-private-dir))
+      (t (setq err 'doom-module-error)
+         (setq dir doom-emacs-dir)))
+    (signal err (list (file-relative-name (concat source ".el") dir) e))))
 
 (defmacro load! (filename &optional path noerror)
   "Load a file relative to the current executing file (`load-file-name').
@@ -623,11 +629,11 @@ This macro accepts, in order:
      lambda).
 
 \(fn HOOKS [:append :local] FUNCTIONS)"
-  (declare (indent (lambda (indent-point state)
+  (declare (debug t)
+           (indent (lambda (indent-point state)
                      (goto-char indent-point)
                      (when (looking-at-p "\\s-*(")
-                       (lisp-indent-defform state indent-point))))
-           (debug t))
+                       (lisp-indent-defform state indent-point)))))
   (let* ((hook-forms (doom--resolve-hook-forms hooks))
          (func-forms ())
          (defn-forms ())
@@ -745,42 +751,6 @@ testing advice (when combined with `rotate-text').
        (dolist (targets (list ,@(nreverse where-alist)))
          (dolist (target (cdr targets))
            (advice-remove target #',symbol))))))
-
-
-;;
-;;; Backports
-
-(when! (version< emacs-version "27.0.90")
-  ;; DEPRECATED Backported from Emacs 27
-  (defmacro setq-local (&rest pairs)
-    "Make variables in PAIRS buffer-local and assign them the corresponding values.
-
-PAIRS is a list of variable/value pairs.  For each variable, make
-it buffer-local and assign it the corresponding value.  The
-variables are literal symbols and should not be quoted.
-
-The second VALUE is not computed until after the first VARIABLE
-is set, and so on; each VALUE can use the new value of variables
-set earlier in the ‘setq-local’.  The return value of the
-‘setq-local’ form is the value of the last VALUE.
-
-\(fn [VARIABLE VALUE]...)"
-    (declare (debug setq))
-    (unless (zerop (mod (length pairs) 2))
-      (error "PAIRS must have an even number of variable/value members"))
-    (let ((expr nil))
-      (while pairs
-        (unless (symbolp (car pairs))
-          (error "Attempting to set a non-symbol: %s" (car pairs)))
-        ;; Can't use backquote here, it's too early in the bootstrap.
-        (setq expr
-              (cons
-               (list 'set
-                     (list 'make-local-variable (list 'quote (car pairs)))
-                     (car (cdr pairs)))
-               expr))
-        (setq pairs (cdr (cdr pairs))))
-      (macroexp-progn (nreverse expr)))))
 
 (provide 'core-lib)
 ;;; core-lib.el ends here

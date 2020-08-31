@@ -37,6 +37,8 @@
 (require 'core-vars)
 (eval-and-compile
   (require 'core-lib))
+(eval-when-compile
+  (load! "autoload/plist"))
 
 (defvar straight-base-dir)
 (defvar straight-repository-branch)

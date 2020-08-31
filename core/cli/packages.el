@@ -168,16 +168,21 @@ list remains lean."
 
 (defun doom--wait-for-compile-jobs ()
   "Wait for all pending async native compilation jobs."
-  (cl-loop for pending = (doom--native-compile-jobs)
-           for tick = 0 then (% (1+ tick) 15)
-           with previous = 0
-           while (not (zerop pending))
-           if (and (zerop tick) (/= previous pending)) do
-           (print! "- Waiting for %d async jobs..." pending)
-           (setq previous pending)
-           else do
-           (let ((inhibit-message t))
-             (sleep-for 0.1)))
+  (when (and (boundp 'comp-files-queue)
+             (fboundp 'comp-async-runnings)
+             (boundp 'comp-async-compilations))
+  (cl-loop
+     for pending = (doom--native-compile-jobs)
+     for tick = 0 then (% (1+ tick) 15)
+     with previous = 0
+     while (not (zerop pending))
+     if (and (zerop tick) (/= previous pending))
+     do
+      (print! "- Waiting for %d async jobs..." pending)
+      (setq previous pending)
+     else do
+      (let ((inhibit-message t))
+        (sleep-for 0.1)))
   ;; HACK Write .error files for any missing files which still don't exist.
   ;;      We'll just assume there was some kind of error...
   (cl-loop for eln-file in doom--expected-eln-files
@@ -187,7 +192,7 @@ list remains lean."
            (make-directory (file-name-directory error-file) 'parents)
            (write-region "" nil error-file)
            (doom-log "Compiled %s" error-file))
-  (setq doom--expected-eln-files nil))
+  (setq doom--expected-eln-files nil)))
 
 
 (defun doom-cli-packages-install ()
