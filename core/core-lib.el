@@ -256,19 +256,19 @@ writes to `standard-output'."
                             (or visit 'no-message) lockname mustbenew)))
            ,@forms))))
 
-(defmacro if! (cond then &rest body)
+(defmacro eval-if! (cond then &rest body)
   "Expands to THEN if COND is non-nil, to BODY otherwise.
-COND is checked at compile/expansion time, allowing BODY to be omitted
-entirely when the elisp is byte-compiled. Use this for forms that contain
-expensive macros that could safely be removed at compile time."
+COND is checked at compile/expansion time, allowing BODY to be omitted entirely
+when the elisp is byte-compiled. Use this for forms that contain expensive
+macros that could safely be removed at compile time."
   (declare (indent 2))
   (if (eval cond)
       then
     (macroexp-progn body)))
 
-(defmacro when! (cond &rest body)
+(defmacro eval-when! (cond &rest body)
   "Expands to BODY if CONDITION is non-nil at compile/expansion time.
-See `if!' for details on this macro's purpose."
+See `eval-if!' for details on this macro's purpose."
   (declare (indent 1))
   (when (eval cond)
     (macroexp-progn body)))
@@ -747,10 +747,10 @@ testing advice (when combined with `rotate-text').
     (while (keywordp (car body))
       (push `(cons ,(pop body) (doom-enlist ,(pop body)))
             where-alist))
-    `(when (fboundp ',symbol)
-       (dolist (targets (list ,@(nreverse where-alist)))
-         (dolist (target (cdr targets))
-           (advice-remove target #',symbol))))))
+    `(dolist (targets (list ,@(nreverse where-alist)))
+       (dolist (target (cdr targets))
+         (advice-remove target #',symbol)))))
+
 
 (provide 'core-lib)
 ;;; core-lib.el ends here

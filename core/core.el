@@ -511,8 +511,7 @@ to least)."
                          "run 'doom sync' on the command line to repair it"))
          ;; Otherwise, something inside the autoloads file is triggering this
          ;; error; forward it!
-         (signal 'doom-autoload-error
-                 (cons doom-autoloads-file e)))))
+         (signal 'doom-autoload-error e))))
 
     ;; Load shell environment, optionally generated from 'doom env'. No need
     ;; to do so if we're in terminal Emacs, where Emacs correctly inherits
