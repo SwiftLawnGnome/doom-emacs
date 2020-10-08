@@ -12,13 +12,13 @@
   (add-to-list 'magic-mode-alist '(+org-journal-p . org-journal-mode))
 
   (defun +org-journal-p ()
+    "Wrapper around `org-journal-is-journal' to lazy load `org-journal'."
     (when-let (buffer-file-name (buffer-file-name (buffer-base-buffer)))
-      (when (or (featurep 'org-journal)
-                (and (file-in-directory-p
-                      buffer-file-name (expand-file-name org-journal-dir org-directory))
-                     (require 'org-journal nil t)))
-        (delq! '+org-journal-p magic-mode-alist 'assq)
-        (org-journal-is-journal))))
+      (if (or (featurep 'org-journal)
+              (and (file-in-directory-p
+                    buffer-file-name (expand-file-name org-journal-dir org-directory))
+                   (require 'org-journal nil t)))
+          (org-journal-is-journal))))
 
   ;; `org-journal-dir' defaults to "~/Documents/journal/", which is an odd
   ;; default, so we change it to {org-directory}/journal (we expand it after
@@ -45,10 +45,10 @@
   (set-popup-rule! "^\\*Org-journal search" :select t :quit t)
 
   (map! (:map org-journal-mode-map
-         :n "]f"  #'org-journal-open-next-entry
-         :n "[f"  #'org-journal-open-previous-entry
-         :n "C-n" #'org-journal-open-next-entry
-         :n "C-p" #'org-journal-open-previous-entry)
+         :n "]f"  #'org-journal-next-entry
+         :n "[f"  #'org-journal-previous-entry
+         :n "C-n" #'org-journal-next-entry
+         :n "C-p" #'org-journal-previous-entry)
         (:map org-journal-search-mode-map
          "C-n" #'org-journal-search-next
          "C-p" #'org-journal-search-previous)
@@ -56,8 +56,8 @@
         (:map org-journal-mode-map
          "c" #'org-journal-new-entry
          "d" #'org-journal-new-date-entry
-         "n" #'org-journal-open-next-entry
-         "p" #'org-journal-open-previous-entry
+         "n" #'org-journal-next-entry
+         "p" #'org-journal-previous-entry
          (:prefix "s"
           "s" #'org-journal-search
           "f" #'org-journal-search-forever
