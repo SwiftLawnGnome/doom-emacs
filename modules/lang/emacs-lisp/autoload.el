@@ -270,7 +270,7 @@ verbosity when editing a file in `doom-private-dir' or `doom-emacs-dir'."
   "Truncates long SHA1 hashes in `package!' :pin's."
   (save-excursion
     (goto-char (match-beginning 0))
-    (and (stringp (plist-get (sexp-at-point) :pin))
+    (and (stringp (plist-get (form-at-point) :pin))
          (search-forward ":pin" nil t)
          (let ((start (re-search-forward "\"[^\"\n]\\{10\\}" nil t)))
            (and start
@@ -286,42 +286,44 @@ verbosity when editing a file in `doom-private-dir' or `doom-emacs-dir'."
 
 Functions are differentiated into special forms, built-in functions and
 library/userland functions"
-  (catch 'matcher
-    (while (re-search-forward lisp-mode-symbol-regexp end t)
-      (let ((ppss (save-excursion (syntax-ppss))))
-        (cond ((ppss-string-terminator ppss) ; strings
-               (search-forward "\"" end t))
-              ((ppss-comment-depth ppss) ; comments
-               (forward-line +1))
-              (t (let ((symbol (intern-soft (match-string-no-properties 0))))
-                   (cond
-                     ((null symbol) nil)
-                     ((eq symbol t) nil)
-                     ((special-variable-p symbol)
-                      (setq +emacs-lisp--face 'font-lock-variable-name-face)
-                      (throw 'matcher t))
-                     ((and (fboundp symbol)
-                           (eq (char-before (match-beginning 0)) ?\()
-                           (not (memq (char-before (1- (match-beginning 0))) (list ?\' ?\`))))
-                      (let* ((unaliased symbol) (is-subr nil))
-                        (while (not (or (eq 'macro (car-safe (setq unaliased (indirect-function unaliased))))
-                                        (eq unaliased (setq unaliased (ad-get-orig-definition unaliased))))))
-                        (unless (or (eq (car-safe unaliased) 'macro)
-                                    (and (eq 'autoload (car-safe unaliased))
-                                         (memq (nth 4 unaliased) '(macro t)))
-                                    (and (setq is-subr (subrp unaliased))
-                                         (eq (cdr (subr-arity unaliased)) 'unevalled)))
-                          (setq +emacs-lisp--face
-                                (cl-macrolet ((real-subr? ()
-                                                ;; compute the check at compile time
-                                                (if (not (fboundp 'subr-native-elisp-p))
-                                                    'is-subr
-                                                  '(and is-subr (not (subr-native-elisp-p unaliased))))))
-                                  (if (real-subr?)
-                                      'font-lock-constant-face
-                                    'font-lock-function-name-face)))
-                          (throw 'matcher t))))))))))
-    nil))
+  (cl-loop
+     with symbol and unaliased and is-subr
+     for start = (re-search-forward lisp-mode-symbol-regexp end t)
+     while start
+     for ppss = (save-excursion (syntax-ppss))
+     if (ppss-string-terminator ppss)
+     do (skip-chars-forward "^\"" end)
+     else if (ppss-comment-depth ppss)
+     do (forward-line +1)
+     else if (or (eq (char-after (match-beginning 0)) ?:)
+                 (null (setq symbol (intern-soft (match-string-no-properties 0))))
+                 (eq symbol t))
+     do (progn)
+     else if (special-variable-p symbol)
+     do (setq +emacs-lisp--face 'font-lock-variable-name-face)
+     and return t
+     else if (and (fboundp symbol)
+                  (eq (char-before (match-beginning 0)) ?\()
+                  (not (memq (char-before (1- (match-beginning 0))) '(?\' ?\`))))
+     do (setq unaliased symbol)
+     and do (setq is-subr nil)
+     and do (while (not (or (eq 'macro (car-safe (setq unaliased (indirect-function unaliased))))
+                            (eq unaliased (setq unaliased (ad-get-orig-definition unaliased))))))
+     and unless (or (eq (car-safe unaliased) 'macro)
+                    (and (eq 'autoload (car-safe unaliased))
+                         (memq (nth 4 unaliased) '(macro t)))
+                    (and (setq is-subr (subrp unaliased))
+                         (eq (cdr (subr-arity unaliased)) 'unevalled)))
+     do (setq +emacs-lisp--face
+              (cl-macrolet ((real-subr? ()
+                              ;; compute the check at compile time
+                              (if (not (fboundp 'subr-native-elisp-p))
+                                  'is-subr
+                                '(and is-subr (not (subr-native-elisp-p unaliased))))))
+                (if (real-subr?)
+                    'font-lock-constant-face
+                  'font-lock-function-name-face)))
+     and return t))
 
 ;; HACK Fontification is already expensive enough. We byte-compile
 ;;      `+emacs-lisp-highlight-vars-and-faces' and `+emacs-lisp-truncate-pin' to
