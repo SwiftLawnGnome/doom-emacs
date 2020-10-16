@@ -182,31 +182,4 @@ and cannot run in."
         (set-char-table-range
          +ligature--composition-table
          (car char-regexp) `([,(cdr char-regexp) 0 font-shape-gstring])))
-      (set-char-table-parent +ligature--composition-table composition-function-table))))
-
- ;; Fallback ligature support for certain, patched fonts. Install them with
- ;; `+ligatures/install-patched-font'
- ((defmacro +ligatures--def-font (id font-plist &rest alist)
-    (declare (indent 2))
-    (let ((alist-var (intern (format "+ligatures-%s-font-alist" id)))
-          (setup-fn  (intern (format "+ligatures-init-%s-font-h" id))))
-      `(progn
-         (setf (alist-get ',id +ligatures--font-alist) (list ,@font-plist))
-         (defvar ,alist-var ',alist ,(format "Name of the %s ligature font." id))
-         (defun ,setup-fn (&rest _)
-           (cl-destructuring-bind (name &key _url files range)
-               (or (alist-get ',id +ligatures--font-alist)
-                   (error "No ligature font called %s" ',id))
-             (when range
-               (set-fontset-font t range name nil 'prepend))
-             (setq-default prettify-symbols-alist
-                           (append (default-value 'prettify-symbols-alist)
-                                   (mapcar #'+ligatures--correct-symbol-bounds ,alist-var)))))
-         (add-hook '+ligatures--init-font-hook #',setup-fn))))
-
-  (defvar +ligatures--font-alist ())
-
-  (cond ((featurep! +fira)         (load! "+fira"))
-        ((featurep! +iosevka)      (load! "+iosevka"))
-        ((featurep! +hasklig)      (load! "+hasklig"))
-        ((featurep! +pragmata-pro) (load! "+pragmata-pro")))))
+      (set-char-table-parent +ligature--composition-table composition-function-table)))))
