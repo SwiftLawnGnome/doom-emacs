@@ -22,6 +22,7 @@ one wants that.")
 (defvar doom-autoloads-cached-vars
   '(doom-modules
     doom-disabled-packages
+    comp-deferred-compilation-black-list
     load-path
     auto-mode-alist
     interpreter-mode-alist
@@ -54,8 +55,9 @@ one wants that.")
              (signal 'doom-error
                      (list "The installed version of Doom has changed since last 'doom sync' ran"
                            "Run 'doom sync' to bring Doom up to speed"))))
-         (mapcar (lambda (var) `(set ',var ',(symbol-value var)))
-                 doom-autoloads-cached-vars)
+         (cl-loop for var in doom-autoloads-cached-vars
+                  when (boundp var)
+                  collect `(set ',var ',(symbol-value var)))
          (doom-autoloads--scan
           (nconc (cl-loop
                     for dir in (cons doom-core-dir

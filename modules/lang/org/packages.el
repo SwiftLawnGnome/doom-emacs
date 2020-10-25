@@ -56,7 +56,7 @@
 (when (featurep! +jupyter)
   (package! jupyter :pin "360cae2c70ab28c7a7848c0c56473d984f0243e5"))
 (when (featurep! +journal)
-  (package! org-journal :pin "34c290c58793617df3ba5458ea586317436ffc2b"))
+  (package! org-journal :pin "fce4fa7e7286280ecd7b42c2f67f0d73048d2c7a"))
 (when (featurep! +noter)
   (package! org-noter :pin "9ead81d42dd4dd5074782d239b2efddf9b8b7b3d"))
 (when (featurep! +pomodoro)
@@ -75,9 +75,7 @@
              :files ("css" "dist" "js" "plugin"))
     :pin "0582f57517c97a4c7bfeb58762138c78883f94c5"))
 (when (featurep! +roam)
-  (package! org-roam :pin "a7cf48ea895ee5aae93ad6d5b4550fb803f6ef8a")
-  (when (featurep! :completion company)
-    (package! company-org-roam :pin "1132663bd68022aa7ea005ff53c7c7571890769d")))
+  (package! org-roam :pin "a7cf48ea895ee5aae93ad6d5b4550fb803f6ef8a"))
 
 ;;; Babel
 (package! ob-async :pin "de1cd6c93242a4cb8773bbe115b7be3d4dd6b97e")

@@ -56,7 +56,18 @@
   (add-hook 'after-change-major-mode-hook #'+company-init-backends-h 'append)
 
   (when (featurep! +tng)
-    (company-tng-mode +1)))
+    (company-tng-mode +1))
+
+  ;; NOTE Fix #1335: ensure `company-emulation-alist' is the first item of
+  ;;      `emulation-mode-map-alists', thus higher priority than keymaps of
+  ;;      evil-mode. We raise the priority of company-mode keymaps
+  ;;      unconditionally even when completion is not activated. This should not
+  ;;      cause problems, because when completion is activated, the value of
+  ;;      `company-emulation-alist' is ((t . company-my-keymap)), when
+  ;;      completion is not activated, the value is ((t . nil)).
+  (add-hook! 'evil-local-mode-hook
+    (when (memq 'company-emulation-alist emulation-mode-map-alists)
+      (company-ensure-emulation-alist))))
 
 
 ;;
@@ -127,7 +138,20 @@
 https://github.com/sebastiencs/company-box/issues/44"
     :around #'company-box--update-scrollbar
     (letf! ((#'display-buffer-in-side-window #'ignore))
-      (apply orig-fn args))))
+      (apply orig-fn args)))
+
+  ;; `company-box' performs insufficient frame-live-p checks. Any command that
+  ;; "cleans up the session" will break company-box.
+  ;; TODO Fix this upstream.
+  (defadvice! +company-box-detect-deleted-frame-a (frame)
+    :filter-return #'company-box--get-frame
+    (if (frame-live-p frame) frame))
+  (defadvice! +company-box-detect-deleted-doc-frame-a (_selection frame)
+    :before #'company-box-doc
+    (and company-box-doc-enable
+         (frame-local-getq company-box-doc-frame frame)
+         (not (frame-live-p (frame-local-getq company-box-doc-frame frame)))
+         (frame-local-setq company-box-doc-frame nil frame))))
 
 
 (use-package! company-dict

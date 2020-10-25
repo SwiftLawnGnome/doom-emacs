@@ -29,7 +29,7 @@
 ;; path/io functions. You get a minor speed up by nooping this. However, this
 ;; may cause problems on builds of Emacs where its site lisp files aren't
 ;; byte-compiled and we're forced to load the *.el.gz files (e.g. on Alpine)
-(unless noninteractive
+(unless (or noninteractive (daemonp))
   (defvar doom--initial-file-name-handler-alist file-name-handler-alist)
 
   (setq file-name-handler-alist nil)
@@ -254,7 +254,9 @@ config.el instead."
 
 (after! comp
   ;; HACK Disable native-compilation for some troublesome packages
-  (add-to-list 'comp-deferred-compilation-black-list "/evil-collection-vterm\\.el\\'"))
+  (dolist (entry (list (concat "\\`" (regexp-quote doom-local-dir) ".*/evil-collection-vterm\\.el\\'")
+                       (concat "\\`" (regexp-quote doom-autoloads-file) "'")))
+    (add-to-list 'comp-deferred-compilation-black-list entry)))
 
 
 ;;
@@ -444,6 +446,12 @@ If this is a daemon session, load them all immediately instead."
 (defvar doom-first-buffer-hook nil
   "Transient hooks run before the first interactively opened buffer.")
 
+(defvar doom-after-reload-hook nil
+  "A list of hooks to run before `doom/reload' has reloaded Doom.")
+
+(defvar doom-before-reload-hook nil
+  "A list of hooks to run after `doom/reload' has reloaded Doom.")
+
 
 ;;
 ;;; Bootstrap helpers
@@ -538,42 +546,42 @@ to least)."
     (eval-after-load 'straight #'doom-initialize-packages)
     ;; (with-eval-after-load 'straight (doom-initialize-packages))
 
+    ;; Bootstrap our GC manager
+    (add-hook 'doom-first-input-hook #'gcmh-mode)
+
     ;; Bootstrap the interactive session
-    (add-hook! 'window-setup-hook
-      (add-hook 'hack-local-variables-hook #'doom-run-local-var-hooks-h)
-      (add-hook 'after-change-major-mode-hook #'doom-run-local-var-hooks-maybe-h 'append)
-      (add-hook 'doom-first-input-hook #'gcmh-mode)
-      (letrec ((run-input-hook
-                (lambda (&rest _)
-                  (run-hook-wrapped 'doom-first-input-hook #'doom-try-run-hook)
-                  (setq doom-first-input-hook nil)
-                  (remove-hook 'doom-first-input-hook run-input-hook))))
-        (put 'doom-first-input-hook 'permanent-local t)
-        (add-hook 'pre-command-hook run-input-hook))
-      ;; (add-hook-trigger! 'doom-first-input-hook 'pre-command-hook)
-      (letrec ((run-file-hook
-                (lambda (&rest _)
-                  (run-hook-wrapped 'doom-first-file-hook #'doom-try-run-hook)
-                  (setq doom-first-file-hook nil)
-                  (remove-hook 'dired-initial-position-hook run-file-hook)
-                  (advice-remove 'after-find-file run-file-hook))))
-        (put 'doom-first-file-hook 'permanent-local t)
-        (add-hook 'dired-initial-position-hook run-file-hook)
-        (advice-add 'after-find-file :before run-file-hook))
-      ;; (add-hook-trigger! 'doom-first-file-hook 'after-find-file 'dired-initial-position-hook)
-      (letrec ((run-buffer-hook
-                (lambda (&rest _)
-                  (run-hook-wrapped 'doom-first-buffer-hook #'doom-try-run-hook)
-                  (setq doom-first-buffer-hook nil)
-                  (remove-hook 'doom-switch-buffer-hook run-buffer-hook)
-                  (advice-remove 'after-find-file run-buffer-hook))))
-        (put 'doom-first-buffer-hook 'permanent-local t)
-        (add-hook 'doom-switch-buffer-hook run-buffer-hook)
-        (advice-add 'after-find-file :before run-buffer-hook))
-      ;; (add-hook-trigger! 'doom-first-buffer-hook 'after-find-file 'doom-switch-buffer-hook)
-      )
+    (add-hook 'after-change-major-mode-hook #'doom-run-local-var-hooks-maybe-h)
     (add-hook 'emacs-startup-hook #'doom-load-packages-incrementally-h)
-    (add-hook 'window-setup-hook #'doom-display-benchmark-h 'append)
+    (add-hook 'hack-local-variables-hook #'doom-run-local-var-hooks-h)
+    (add-hook 'window-setup-hook #'doom-display-benchmark-h)
+    ;; (add-hook-trigger! 'doom-first-buffer-hook 'after-find-file 'doom-switch-buffer-hook)
+    ;; (add-hook-trigger! 'doom-first-file-hook 'after-find-file 'dired-initial-position-hook)
+    ;; (add-hook-trigger! 'doom-first-input-hook 'pre-command-hook)
+    (letrec ((run-input-hook
+              (lambda (&rest _)
+                (run-hook-wrapped 'doom-first-input-hook #'doom-try-run-hook)
+                (setq doom-first-input-hook nil)
+                (remove-hook 'doom-first-input-hook run-input-hook))))
+      (put 'doom-first-input-hook 'permanent-local t)
+      (add-hook 'pre-command-hook run-input-hook))
+    (letrec ((run-file-hook
+              (lambda (&rest _)
+                (run-hook-wrapped 'doom-first-file-hook #'doom-try-run-hook)
+                (setq doom-first-file-hook nil)
+                (remove-hook 'dired-initial-position-hook run-file-hook)
+                (advice-remove 'after-find-file run-file-hook))))
+      (put 'doom-first-file-hook 'permanent-local t)
+      (add-hook 'dired-initial-position-hook run-file-hook)
+      (advice-add 'after-find-file :before run-file-hook))
+    (letrec ((run-buffer-hook
+              (lambda (&rest _)
+                (run-hook-wrapped 'doom-first-buffer-hook #'doom-try-run-hook)
+                (setq doom-first-buffer-hook nil)
+                (remove-hook 'doom-switch-buffer-hook run-buffer-hook)
+                (advice-remove 'after-find-file run-buffer-hook))))
+      (put 'doom-first-buffer-hook 'permanent-local t)
+      (add-hook 'doom-switch-buffer-hook run-buffer-hook)
+      (advice-add 'after-find-file :before run-buffer-hook))
     (if doom-debug-p (doom-debug-mode +1))
 
     ;; Load core/core-*.el, the user's private init.el, then their config.el
