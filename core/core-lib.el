@@ -349,19 +349,17 @@ If FETCHER is a function, ELT is used as the key in LIST (an alist)."
 (defmacro pushnew! (place &rest values)
   "Push VALUES sequentially into PLACE, if they aren't already present.
 This is a variadic `cl-pushnew'."
-  (gv-letplace (getter setter) place
-    (let* (;; (var (make-symbol "result"))
-           (res getter))
-      ;; `(dolist (,var (list ,@values) (with-no-warnings ,place))
-      ;;    (cl-pushnew ,var ,place :test #'equal))
-      (while values
-        (setq res `(cl-adjoin ,(pop values) ,res :test #'equal)))
-      (funcall setter res))))
+  (if (not values)
+      place
+    (gv-letplace (getter setter) place
+      (let ((res getter))
+        (while values
+          (setq res `(cl-adjoin ,(pop values) ,res :test #'equal)))
+        (funcall setter res)))))
 
 (defmacro prependq! (sym &rest lists)
   "Prepend LISTS to SYM in place."
   `(setq ,sym (append ,@lists ,sym)))
-
 
 ;;; Loading
 (defmacro add-load-path! (&rest dirs)

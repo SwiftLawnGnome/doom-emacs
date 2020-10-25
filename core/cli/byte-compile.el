@@ -12,10 +12,11 @@
 (defvar use-package-expand-minimally)
 
 (defcli! (compile c)
-    ((recompile-p ["-r" "--recompile"])
-     (core-p      ["-c" "--core"])
-     (private-p   ["-p" "--private"])
-     (verbose-p   ["-v" "--verbose"]))
+    ((recompile-p ["-r" "--recompile"] "Only recompile files already byte-compiled")
+     (all-p       ["-a" "--all"] "Compile all files, like doom compile && doom compile -p")
+     (core-p      ["-c" "--core"] "Compile doom core files only")
+     (private-p   ["-p" "--private"] "Compile private config files only")
+     (verbose-p   ["-v" "--verbose"] "Talk about it"))
   "Byte-compiles your config or selected modules.
 
   compile [TARGETS...]
@@ -26,17 +27,21 @@ Accepts :core and :private as special arguments, which target Doom's core files
 and your private config files, respectively. To recompile your packages, use
 'doom build' instead."
   (doom-cli-byte-compile
-   (if (or core-p private-p)
+   (if (and (not all-p) (or core-p private-p))
        (append (when core-p
                  (list (doom-glob doom-emacs-dir "init.el") doom-core-dir))
                (when private-p (list doom-private-dir)))
      (doom-list* (doom-glob doom-emacs-dir "init.el")
                  doom-core-dir
-                 (doom-keep
-                  ;; Only compile Doom's modules
-                  (lambda (path) (file-in-directory-p path doom-emacs-dir))
-                  ;; Omit `doom-private-dir', which is always first
-                  (cdr (doom-module-load-path)))))
+                 (let ((modules (doom-module-load-path)))
+                   (if all-p
+                       modules
+                     (doom-keep
+                      ;; Only compile Doom's modules
+                      (lambda (path)
+                        (file-in-directory-p path doom-emacs-dir))
+                      ;; Omit `doom-private-dir', which is always first
+                      (cdr modules))))))
    recompile-p
    verbose-p))
 
@@ -93,8 +98,9 @@ If RECOMPILE-P is non-nil, only recompile out-of-date files."
              (cons (let ((target-dirs (doom-keep #'file-directory-p targets)))
                      (lambda (path)
                        (and (not (doom--byte-compile-ignore-file-p path))
-                            (cl-find-if (doom-partial #'file-in-directory-p path) target-dirs)
-                            (cl-pushnew path targets))))
+                            (not (member path targets))
+                            (cl-find path target-dirs :test #'file-in-directory-p)
+                            (push path targets))))
                    after-load-functions))))
       (doom-log "Reloading Doom in preparation for byte-compilation")
       ;; But first we must be sure that Doom and your private config have been
