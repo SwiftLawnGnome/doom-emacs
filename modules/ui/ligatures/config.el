@@ -36,7 +36,7 @@
     :intersect     "∩"
     :diff          "∖"
     :tuple         "⨂"
-    :pipe          "" ;; FIXME: find a non-private char
+    :pipe          "ǁ" ;; FIXME: find a non-private char
     :dot           "•")
   "Maps identifiers to symbols, recognized by `set-ligatures'.
 
@@ -143,10 +143,12 @@ and cannot run in."
         (run-hooks '+ligatures--init-font-hook)
         (setq +ligatures--init-font-hook nil)))
     (when (and (featurep! +extra)
-               (+ligatures--enable-p +ligatures-extras-in-modes))
-      (prependq! prettify-symbols-alist (alist-get major-mode +ligatures-extra-alist)))
-    (when prettify-symbols-alist
-      (if prettify-symbols-mode (prettify-symbols-mode -1))
+               (+ligatures--enable-p +ligatures-extras-in-modes)
+               (not (and prettify-symbols-mode
+                         (eq prettify-symbols-alist
+                             (prependq! prettify-symbols-alist
+                                        (alist-get major-mode +ligatures-extra-alist))))))
+      (prettify-symbols-mode -1)
       (prettify-symbols-mode +1))))
 
 
