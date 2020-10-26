@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; tools/eval/packages.el
 
 (package! quickrun :pin "005d269ce5080a127b44e0d29efe2f2e9852d0cc")

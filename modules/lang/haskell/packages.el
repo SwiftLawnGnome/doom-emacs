@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/haskell/packages.el
 
 (package! haskell-mode :pin "e72677668f5fc7cc148008e885a0f256e245dd43")

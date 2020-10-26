@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; term/eshell/packages.el
 
 (package! eshell-up :pin "9c100bae5c3020e8d9307e4332d3b64e7dc28519")

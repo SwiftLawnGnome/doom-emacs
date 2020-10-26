@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; completion/company/packages.el
 
 (package! company :pin "5f5949b6ae8ea9df94c6cb3e01d9cae43623b794")

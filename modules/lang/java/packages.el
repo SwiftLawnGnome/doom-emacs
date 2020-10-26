@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/java/packages.el
 
 (package! android-mode :pin "d5332e339a1f5e30559a53feffb8442ca79265d6")
@@ -14,4 +14,4 @@
 
 (when (featurep! +lsp)
   (unless (featurep! :tools lsp +eglot)
-    (package! lsp-java :pin "3f1ed1762fd7cb2fece606df6fc63d35d0a6b835")))
+    (package! lsp-java :pin "8153928d8ae072e354036c1c9e881cb1d179d081")))

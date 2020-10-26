@@ -1,10 +1,10 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/python/packages.el
 
 ;; Major modes
 (package! pip-requirements :pin "216cd1690f80cc965d4ae47b8753fc185f778ff6")
 (when (featurep! +cython)
-  (package! cython-mode :pin "ba6cbed8193775c80402bc5112cbaf16246ee6bd")
+  (package! cython-mode :pin "0b74f1d14172c0465426238010189d3cea211ccf")
   (when (featurep! :checkers syntax)
     (package! flycheck-cython :pin "ecc4454d35ab5317ab66a04406f36f0c1dbc0b76")))
 
@@ -12,8 +12,8 @@
 (when (featurep! +lsp)
   (unless (featurep! :tools lsp +eglot)
     (if (featurep! +pyright)
-        (package! lsp-pyright :pin "ccd00074622520acb7a65357a59d8c8426c12a00")
-      (package! lsp-python-ms :pin "a0c56f429e14cc9086fd06aa764e9aab697970d7"))))
+        (package! lsp-pyright :pin "d9e7d3cf1bdc8ee0395c8df4408b05ee3ba9c22a")
+      (package! lsp-python-ms :pin "c4ebc7a11398733055a1dc07f9cffacd04d1c2dc"))))
 
 ;; Programming environment
 (package! anaconda-mode :pin "39b1cf88c8c459901630d248d6135d8644075648")

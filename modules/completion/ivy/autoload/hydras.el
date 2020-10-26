@@ -1,5 +1,10 @@
 ;;; completion/ivy/autoload/hydras.el -*- lexical-binding: t; -*-
-;;;###if (featurep! :ui hydra)
+;;;###if (and nil (featurep! :ui hydra))
+
+(eval-when-compile
+  (require 'ivy-hydra)
+  (require 'hydra)
+  (require 'core-lib))
 
 ;;;###autoload
 (after! ivy-hydra

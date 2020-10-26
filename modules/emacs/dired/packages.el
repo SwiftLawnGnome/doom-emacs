@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; emacs/dired/packages.el
 
 (package! diredfl :pin "cd052dfef602fe79d8dfbcf9f06e6da74412218b")

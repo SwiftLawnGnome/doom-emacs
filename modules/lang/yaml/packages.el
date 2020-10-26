@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/yaml/packages.el
 
 (package! yaml-mode :pin "68fecb5f0dec712a10c8655df6881392a4613617")

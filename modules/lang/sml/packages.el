@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/sml/packages.el
 
 (package! sml-mode :pin "60b01d7ebc600b61603d20a049570843b5e047d3")

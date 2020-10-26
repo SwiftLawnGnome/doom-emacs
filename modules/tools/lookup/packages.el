@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; tools/lookup/packages.el
 
 ;; HACK `dumb-jump' uses the `helm-build-sync-source' macro, but this requires
@@ -8,14 +8,14 @@
   (package! helm))
 
 ;;
-(package! dumb-jump :pin "fbbe6b0c3010bea8a6eaac2297080137319160e2")
+(package! dumb-jump :pin "97b0dfb617533cce128dcfe4956da5d88de07bca")
 (when (featurep! :completion ivy)
   (package! ivy-xref :pin "3d4c35fe2b243d948d8fe02a1f0d76a249d63de9"))
 (when (featurep! :completion helm)
   (package! helm-xref :pin "23f1174cfca7667d95828dcd388c655a4a9c877d"))
 
 ;; For dictionary and online lookup
-(package! request :pin "d02d1347ffdf138cffd380cbeac62ac8732036ef")
+(package! request :pin "94f87a84fd3c643bd85638e667f01513c9223ea5")
 
 (when (featurep! +docsets)
   (package! dash-docs :pin "dafc8fc9f1ddb2e4e39e0b8d066c42d5d7ce8d06")

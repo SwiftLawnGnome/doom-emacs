@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/common-lisp/packages.el
 
 (when (package! sly :pin "fce4f9be39b6a40a4128458ff34151eecb5e27de")

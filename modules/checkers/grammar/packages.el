@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; checkers/grammar/packages.el
 
 (package! langtool :pin "8276eccc5587bc12fd205ee58a7a982f0a136e41")

@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; tools/gist/packages.el
 
 (package! gist :pin "314fe6ab80fae35b95f0734eceb82f72813b6f41")

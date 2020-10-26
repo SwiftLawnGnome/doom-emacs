@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; tools/rgb/packages.el
 
 (package! rainbow-mode :pin "fdff98b12e62df7a6dbb009321430c90a47bb89b")

@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; emacs/ibuffer/packages.el
 
 (package! ibuffer-projectile :pin "ecbe482804a217b1471593f6c7a8b3d64f3cdc47")

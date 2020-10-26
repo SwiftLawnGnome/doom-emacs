@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; editor/snippets/packages.el
 
 (package! yasnippet :pin "5cbdbf0d2015540c59ed8ee0fcf4788effdf75b6")

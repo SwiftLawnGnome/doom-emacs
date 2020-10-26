@@ -1,4 +1,5 @@
 ;;; ui/hydra/autoload/windows.el -*- lexical-binding: t; -*-
+(eval-when-compile (require 'hydra))
 
 ;;;###autoload (autoload '+hydra/text-zoom/body "ui/hydra/autoload/windows" nil t)
 (defhydra +hydra/text-zoom (:hint nil :color red)

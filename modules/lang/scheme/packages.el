@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/scheme/packages.el
 
 (package! geiser :pin "2accab72e289ed82707237d2013ba034c88ff6c2")

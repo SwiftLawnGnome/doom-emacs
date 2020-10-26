@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/go/packages.el
 
 (package! go-eldoc :pin "cbbd2ea1e94a36004432a9ac61414cb5a95a39bd")
