@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/web/packages.el
 
 ;; +html.el
@@ -6,7 +6,7 @@
 (package! haml-mode :pin "bf5b6c11b1206759d2b28af48765e04882dd1fc4")
 (package! pug-mode :pin "685fd3414d89736bf232f5d1a6bed9e0353b98fe")
 (package! slim-mode :pin "3636d18ab1c8b316eea71c4732eb44743e2ded87")
-(when (package! web-mode :pin "b4b0a857088d12cf254f6a2105c58039f29a0d04")
+(when (package! web-mode :pin "890e837f7ea49f54c02b107377036431cbe7adb6")
   (when (featurep! :completion company)
     (package! company-web :pin "f0cc9187c9c34f72ad71f5649a69c74f996bae9a")))
 

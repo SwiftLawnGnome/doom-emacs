@@ -1,5 +1,8 @@
 ;;; tools/lsp/config.el -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'core-lib))
+
 (defvar +lsp-defer-shutdown 3
   "If non-nil, defer shutdown of LSP servers for this many seconds after last
 workspace buffer is closed.
@@ -22,16 +25,11 @@ killing and opening many LSP/eglot-powered buffers.")
   :init-value nil
   (if (not +lsp-optimization-mode)
       (setq-default read-process-output-max +lsp--default-read-process-output-max
-                    gcmh-high-cons-threshold +lsp--default-gcmh-high-cons-threshold
-                    +lsp--optimization-init-p nil)
+                    gcmh-high-cons-threshold +lsp--default-gcmh-high-cons-threshold)
     ;; Only apply these settings once!
     (unless +lsp--optimization-init-p
-      (setq +lsp--default-read-process-output-max
-            ;; DEPRECATED Remove check when 26 support is dropped
-            (if (boundp 'read-process-output-max)
-                (default-value 'read-process-output-max))
-            +lsp--default-gcmh-high-cons-threshold
-            (default-value 'gcmh-high-cons-threshold))
+      (setq +lsp--default-read-process-output-max (default-value 'read-process-output-max)
+            +lsp--default-gcmh-high-cons-threshold (default-value 'gcmh-high-cons-threshold))
       ;; `read-process-output-max' is only available on recent development
       ;; builds of Emacs 27 and above.
       (setq-default read-process-output-max (* 1024 1024))

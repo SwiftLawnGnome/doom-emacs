@@ -9,4 +9,4 @@
         ((featurep! :completion helm)
          (package! flyspell-correct-helm))
         ((package! flyspell-correct-popup)))
-  (package! flyspell-lazy :pin "3ebf68cc9eb10c972a2de8d7861cbabbbce69570"))
+  (package! flyspell-lazy :pin "d57382cf06462931cb354f5630469425fce56396"))

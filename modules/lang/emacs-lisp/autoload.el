@@ -292,38 +292,41 @@ library/userland functions"
      while start
      for ppss = (save-excursion (syntax-ppss))
      if (ppss-string-terminator ppss)
-     do (skip-chars-forward "^\"" end)
+       do (skip-chars-forward "^\"" end)
      else if (ppss-comment-depth ppss)
-     do (forward-line +1)
-     else if (or (eq (char-after (match-beginning 0)) ?:)
-                 (null (setq symbol (intern-soft (match-string-no-properties 0))))
-                 (eq symbol t))
-     do (progn)
-     else if (special-variable-p symbol)
-     do (setq +emacs-lisp--face 'font-lock-variable-name-face)
-     and return t
-     else if (and (fboundp symbol)
-                  (eq (char-before (match-beginning 0)) ?\()
-                  (not (memq (char-before (1- (match-beginning 0))) '(?\' ?\`))))
-     do (setq unaliased symbol)
-     and do (setq is-subr nil)
-     and do (while (not (or (eq 'macro (car-safe (setq unaliased (indirect-function unaliased))))
+            do (forward-line +1)
+     else
+       if (or (eq (char-after (match-beginning 0)) ?:)
+              (null (setq symbol (intern-soft (match-string-no-properties 0))))
+              (eq symbol t))
+         do (progn)
+     else
+       if (special-variable-p symbol)
+         do (setq +emacs-lisp--face 'font-lock-variable-name-face)
+         and return t
+     else
+     if (and (fboundp symbol)
+             (eq (char-before (match-beginning 0)) ?\()
+             (not (eq (char-before (1- (match-beginning 0))) ?\')))
+         do (setq unaliased symbol)
+            (setq is-subr nil)
+            (while (not (or (eq 'macro (car-safe (setq unaliased (indirect-function unaliased))))
                             (eq unaliased (setq unaliased (ad-get-orig-definition unaliased))))))
-     and unless (or (eq (car-safe unaliased) 'macro)
-                    (and (eq 'autoload (car-safe unaliased))
-                         (memq (nth 4 unaliased) '(macro t)))
-                    (and (setq is-subr (subrp unaliased))
-                         (eq (cdr (subr-arity unaliased)) 'unevalled)))
-     do (setq +emacs-lisp--face
-              (cl-macrolet ((real-subr? ()
-                              ;; compute the check at compile time
-                              (if (not (fboundp 'subr-native-elisp-p))
-                                  'is-subr
-                                '(and is-subr (not (subr-native-elisp-p unaliased))))))
-                (if (real-subr?)
-                    'font-lock-constant-face
-                  'font-lock-function-name-face)))
-     and return t))
+         and unless (or (eq (car-safe unaliased) 'macro)
+                        (and (eq 'autoload (car-safe unaliased))
+                             (memq (nth 4 unaliased) '(macro t)))
+                        (and (setq is-subr (subrp unaliased))
+                             (eq (cdr (subr-arity unaliased)) 'unevalled)))
+               do (setq +emacs-lisp--face
+                        (cl-macrolet ((real-subr? ()
+                                        ;; compute the check at compile time
+                                        (if (not (fboundp 'subr-native-elisp-p))
+                                            'is-subr
+                                          '(and is-subr (not (subr-native-elisp-p unaliased))))))
+                          (if (real-subr?)
+                              'font-lock-constant-face
+                            'font-lock-function-name-face)))
+               and return t))
 
 ;; HACK Fontification is already expensive enough. We byte-compile
 ;;      `+emacs-lisp-highlight-vars-and-faces' and `+emacs-lisp-truncate-pin' to

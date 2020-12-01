@@ -62,7 +62,7 @@ In tty Emacs, messages suppressed completely."
 (defun doom-apply-ansi-color-to-compilation-buffer-h ()
   "Applies ansi codes to the compilation buffers. Meant for
 `compilation-filter-hook'."
-  (require 'ansi-color-apply-on-region)
+  (require 'ansi-color)
   (with-silent-modifications
     (bound! (#'ansi-color-apply-on-region compilation-filter-start)
       (ansi-color-apply-on-region compilation-filter-start (point)))))

@@ -1,4 +1,4 @@
-;; -*- no-byte-compile: t; -*-
+;; -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; lang/julia/packages.el
 
 (package! julia-mode :pin "8ea90c7927f6d87a291cfb0216f34dacf43c722e")

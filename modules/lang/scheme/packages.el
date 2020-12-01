@@ -6,4 +6,4 @@
 (when (featurep! :checkers syntax)
   (package! flycheck-guile
     :recipe (:host github :repo "flatwhatson/flycheck-guile")
-    :pin "2940f1622fa352e7ca95a9e4ad65958c5575da02"))
+    :pin "27f4be2eaadabd4a51060fd4600e76be1e57bc7a"))
