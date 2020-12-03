@@ -561,7 +561,7 @@ to least)."
               (lambda (&rest _)
                 (run-hook-wrapped 'doom-first-input-hook #'doom-try-run-hook)
                 (setq doom-first-input-hook nil)
-                (remove-hook 'doom-first-input-hook run-input-hook))))
+                (remove-hook 'pre-command-hook run-input-hook))))
       (put 'doom-first-input-hook 'permanent-local t)
       (add-hook 'pre-command-hook run-input-hook))
     (letrec ((run-file-hook

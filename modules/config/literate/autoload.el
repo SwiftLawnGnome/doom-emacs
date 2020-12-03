@@ -69,12 +69,13 @@ byte-compiled from.")
                       ;; hooks later, and speed up `org-mode' init.
                       (org-mode-hook nil)
                       (org-inhibit-startup t))
-                  (org-mode)
-                  (with-silent-modifications
-                    ;; Tangling won't ordinarily expand #+INCLUDE directives,
-                    ;; so I do it myself.
-                    (org-export-expand-include-keyword)
-                    (org-babel-tangle nil dest))))
+                  (delay-mode-hooks
+                    (org-mode)
+                    (with-silent-modifications
+                      ;; Tangling won't ordinarily expand #+INCLUDE directives,
+                      ;; so I do it myself.
+                      (org-export-expand-include-keyword)
+                      (org-babel-tangle nil dest)))))
             (ignore-errors (delete-file backup)))
           ;; Write an empty file to serve as our mtime cache
           (with-temp-file cache)
